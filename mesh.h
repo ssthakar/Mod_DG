@@ -29,7 +29,7 @@ namespace const_properties
 namespace EOS
 {
 	//equation of state for a monoatomic_gas;
-	double perf_gas(double rho, double E,double u,double v); // compute the pressure from the equation of state
+	inline double perf_gas(double rho, double E,double u,double v); // compute the pressure from the equation of state
 }
 
 // convenient typedefs for ease of use
@@ -56,17 +56,19 @@ namespace grid
 	class mesh 
 	{
 		public:
-			
-			
-			int nelem,ndimn,ntype,npoin,nbface;
-			int neqns;
+			int nelem; //number of grid cells without periodic boundary conditions
+			int ndimn; // dimension of problem 2D or 3d
+			int ntype; // type of cell (does not support hybrid cells) 3 for triangle etc
+			int npoin; // number of nodes
+			int nbface;// number of boundary faces
+			int neqns; // number of conservative variables
 			int ndegr; //taken from control file,// 1 for P(0) 3 for P(1) and 6 for P(2)
 			int ngauss_domn; // the number of gasss points for the domain integral taken from control file 
 			int ngauss_boun; // the number of gauss points for the boundary of each cell taken from control file
 			double A_min; //store in the smallest cell size for CFL condition and timestep calculation
-			int nmaxface;
-			
-			//control will store in inlet velocity, order of polynomial etc
+			int nmaxface; //total number of faces in the mesh including internal and boundary
+			int nintface; // number of internal faces
+			//control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
 
 			//mesh members
@@ -77,32 +79,44 @@ namespace grid
 			matrix2i esup2; // support data struct for abve
 			matrix2i esuel; //element surrounding element data structure
 			matrix2i intface; //interface connectivity matrix 
-			matrix2d geoface; // data structure to store in normal vector for each face, and gauss points
+			matrix2d geoface; // data structure to store in boundary face data
+			matrix2d int_geoface; // data structure to store in internal face data
 
-			//store in jacobian, shape function integrals 
+			//store in jacobian, shape function integrals guass point locations 
+			matrix2d domn_weights; // vectors to store in domain weights depending on number of gauss points used 
+			matrix2d line_weights; //vector to store in weights for the boundary integral depending on number of guass points used
 			matrix2d geoel;// data structure to store in domain data for each element
 				
 			//solution containers
 			matrix3d U; //3d array that stores in the solution unknowns. for each variable
+			matrix3d rhsel; //3d array to store rhs for each element
 			
-			matrix3d rhsel; //3d array to store the rhs of every element to solve the time marching 
-			
-			//for finite volume method the basis function is 1
 			// fv_U(i,) = rho | U | V | E 
 			matrix2d fv_U; //2d array to store in solution for P(0) DG finite volume
 			
-			void get_massMatx(); //get the values of mass matrix and store it in geoel
 			//mesh methods
 			mesh(std::string s1, std::string s2); // constructor reads in mesh file, and control file
-			//void pre_proc(); //computes all data structures needed in the simulation
-	};
-	void set_esup(mesh &mesh1);
-	void set_esuel(mesh &mesh1);
-	void set_intfafce(mesh &mesh1);
-	void set_geoface(mesh &mesh1);
-	void set_geoel(mesh &mesh1);
-}
 
+	};
+
+	// subroutines to generate data structures for mesh 
+	namespace pre_proc
+	{
+		void set_esup(grid::mesh &mesh1); //generates esup1 and esup2 
+		void set_esuel(grid::mesh &mesh1); //generates elsuel
+		void set_intfafce(grid::mesh &mesh1); //generate inter face connectivity
+		void set_bface(grid::mesh &mesh1);
+		void set_boun_geoface(grid::mesh &mesh1); //generates face data 
+		void set_geoel(mesh &mesh1); //generates element data
+		double el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3); // calculate element jacobian 
+		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face 
+	}
+
+	namespace post_proc
+	{
+		void writevtk_mesh(grid::mesh &mesh1,std::string file_name);
+	}
+}
 
 
 #endif 

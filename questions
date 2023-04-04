@@ -1,0 +1,8 @@
+How to  include the boundary flags 2 and 4 with periodic condition
+
+storage order for 3d array, nelem,ndegre nvars or nelem,nvars, ndegree
+
+mass matrix constant for taylor basis functions for each elements
+	B2B2domega B2B3domega
+:Wq
+:Wq

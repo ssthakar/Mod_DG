@@ -69,18 +69,21 @@ grid::mesh::mesh(std::string s1, std::string s2)
 			coords(i, j) =v[i + 10 + nelem][j + 1];
 		}
 	}
-	bface.resize(nbface,3);//init bface matrix and give size 
+	//bface format
+	// ith row (ip1 ip2 host el ghost el face_flag)
+	bface.resize(nbface,5);//init bface matrix and give size 
 	for(int i=0;i<nbface;i++)
 	{
-		for(int j=0;j<3;j++)
+		for(int j=0;j<2;j++)
 		{
 			bface(i,j) = v[i+nelem+2*npoin+12][j+1];
 		}
+		bface(i,4) = v[i+nelem+2*npoin+12][3];
 	}
 }
 
 //sub to generate elemenst surrounding points linked list
-void grid::set_esup(mesh &mesh1)
+void grid::pre_proc::set_esup(grid::mesh &mesh1)
 {
 	mesh1.esup2.resize(mesh1.npoin + 1, 1); // init matrix to store in index 
 	// this pass counts number of elements surrounding every point and stores that number in +1 index corresponding to that particular point
@@ -123,7 +126,7 @@ void grid::set_esup(mesh &mesh1)
 }
 
 //sub to generate elements surrounding elements data
-void grid::set_esuel(mesh &mesh1)
+void grid::pre_proc::set_esuel(grid::mesh &mesh1)
 {
 	// subroutine to generalte element surrounding element data structure
 	// init elsuel data structure
@@ -226,65 +229,70 @@ void grid::set_esuel(mesh &mesh1)
 
 	*/ 
 
+//subroutine to update and complete the bface data structuren initiated in the mesh constructor
+
+void grid::pre_proc::set_bface(grid::mesh &mesh1)
+{
+	int bf = 0; //counter for boundary face number;
+	for(int i=0;i<mesh1.nelem;i++) //loop through all the elements 
+	{
+		for(int j=0;j<mesh1.ntype;j++) //loop over all the faces of the element 
+		{
+			int E = mesh1.esuel(i,j);
+			if(E==0 and E-1<i) //this is a boundary cell and has boundar face
+			{
+				mesh1.bface(bf,3) = bf+1+mesh1.nelem;
+				int &p1 = mesh1.bface(bf,0);
+				int &p2 = mesh1.bface(bf,1); //get local points 
+				int nesup1 = mesh1.esup2(p1,0) - mesh1.esup2(p1-1,0); //number of elements  surrounding point p1 
+				for(int r=0;r<nesup1;r++)
+				{
+					int &s_index = mesh1.esup2(p1-1,0); //get starting index for esup1 array
+					int &e = mesh1.esup1(s_index+r,0);
+					for(int s = 0;s<mesh1.ntype;s++)
+					{
+						if(mesh1.inpoel(e-1,s) == p2)
+							mesh1.bface(bf,2) = e;
+					}
+				}
+				bf++;
+			}
+		}
+	}
+} 
 
 
-void grid::set_intfafce(mesh &mesh1)
+void grid::pre_proc::set_intfafce(grid::mesh &mesh1)
 {
 	mesh1.nmaxface = (3 * mesh1.nelem + mesh1.nbface) / 2;
-	std::cout << " max faces is " << mesh1.nmaxface << std::endl;
-	mesh1.intface.resize(mesh1.nmaxface, 5); // init intface matrix
-	int nface = 0;				 // counter for periodic boundary
+	mesh1.nintface = mesh1.nmaxface - mesh1.nbface;
+	mesh1.intface.resize(mesh1.nintface, 4); // init intface matrix
 	int m = 0; // face counter
-	int bf = 0;;
-	// subroutinea to populate intface matrix, using periodic boundary condition
 	for (int i = 0; i < mesh1.nelem; i++) //loop through all the elements 
 	{
 		for (int j = 0; j < mesh1.ntype; j++) //loop over all faces of the element 
 		{
-			int e = mesh1.esuel(i, j);
-			if(e == 0 and e-1<i) //this is a boundary cell
+			int &e = mesh1.esuel(i, j); //get element surrouding current element	
+			if (e != 0 and e < i+1) // this is an internal cell
 			{
-				nface++;
-				mesh1.intface(m,0) = mesh1.bface(bf,0); //push boundary face data in ip1 
-				mesh1.intface(m,1) = mesh1.bface(bf,1);// ip2 
-				mesh1.intface(m,4) = mesh1.bface(bf,2);// boundary type flag
-				mesh1.intface(m,3) = mesh1.nelem+nface;
-				int ip1 = mesh1.bface(bf,0);
-				int ip2 = mesh1.bface(bf,1);
-				int nesup1 = mesh1.esup2(ip1, 0) - mesh1.esup2(ip1 - 1, 0);
-				for(int r=0;r<nesup1;r++) //loop over all elements surrounding point p1
-				{
-					int s_index = mesh1.esup2(ip1-1,0); //get starting index
-					int e = mesh1.esup1(s_index+r,0); //get element tag
-					for(int s=0;s<mesh1.ntype;s++) //loop through all the points in the element 
-					{
-						if(mesh1.inpoel(e-1,s) == ip2)
-						mesh1.intface(m,2) = e;
-					}
-				}
-				m++;
-				bf++;
-			}
-			if (e != 0 && e - 1 < i) // this is an internal cell
-			{
-				if (j != 2)
+				if (j != mesh1.ntype-1)
 				{
 					mesh1.intface(m, 0) = mesh1.inpoel(i, j);
 					mesh1.intface(m, 1) = mesh1.inpoel(i, j + 1);
-					mesh1.intface(m, 3) = e;
-					mesh1.intface(m, 2) = i + 1;
-					mesh1.intface(m,4) = 0; //flag for internal face 
-					m++;
+					mesh1.intface(m, 2) = e;
+					mesh1.intface(m, 3) = i + 1;
+					//mesh1.intface(m,4) = 0; //flag for internal face 
+					//m++;
 				}
 				else
 				{
 					mesh1.intface(m, 0) = mesh1.inpoel(i, 2);
-					mesh1.intface(m, 1) = mesh1.inpoel(i, 1);
-					mesh1.intface(m, 3) = e;
-					mesh1.intface(m, 2) = i + 1;
-					mesh1.intface(m,4) = 0; //flag for internal face 
-					m++;
+					mesh1.intface(m, 1) = mesh1.inpoel(i, 0);
+					mesh1.intface(m, 2) = e;
+					mesh1.intface(m, 3) = i + 1;
+					//mesh1.intface(m,4) = 0; //flag for internal face 
 				}
+				m++;
 			}
 		}
 	} 
@@ -292,12 +300,16 @@ void grid::set_intfafce(mesh &mesh1)
 
 
 //sub to generate face data needed for DG formulation
-void grid::set_geoface(mesh &mesh1)
+void grid::pre_proc::set_boun_geoface(mesh &mesh1)
 {
-	//format for geoface data structure (nx ny G1x G1y G2x G2y)
+	//format for geoface data structure (nx ny G1x G1y G2x G2y len of face)
+
+	//TODO add fucntionality to find out the size of the geoface vector depending on ngauss
+	// 2 components of the normal vector 2*ngauss for the gauss poitns and 1 for length of the face
 
 	// generate geoface data structure using intface, intpoel, coords 
-	mesh1.geoface.resize(mesh1.nmaxface,6);
+	//mesh1.geoface.resize(mesh1.nmaxface,mesh1.ngauss_boun*2+3);
+	mesh1.geoface.resize(mesh1.nmaxface,7);
 	for(int i=0;i<mesh1.nmaxface;i++)
 	{
 		double nx,ny;// components of the outward area normal vector
@@ -314,9 +326,7 @@ void grid::set_geoface(mesh &mesh1)
 		mesh1.geoface(i,1) = ny;
 		
 
-		// Note for two points the weights are 1 
-		//calculate gauss quadrature points needed for rhs integral, for now i am using 2, but later can change it to user defined
-		//transformation to get coords for the gauss points 
+		// compute the coords of teh gauss points 
 		double E1  = -1/sqrt(3);
 		double E2 = 1/sqrt(3);
 		double gx1 = 0.5*(1-E1)*p1x + 0.5*(1+E1)*p2x;
@@ -327,14 +337,32 @@ void grid::set_geoface(mesh &mesh1)
 		mesh1.geoface(i,3) = gy1;
 		mesh1.geoface(i,4) = gx2;
 		mesh1.geoface(i,5) = gy2;
+		mesh1.geoface(i,6) = grid::pre_proc::len(p1x,p2x,p1y,p2y); 
 	}
 }
 
 
 // sub to compute element data like shape functions etc
-void grid::set_geoel(mesh &mesh1)
+//
+//geoel ith row (jacobian | g1x | g1y | g2x | g2y | g3x | g3y |)
+//
+void grid::pre_proc::set_geoel(mesh &mesh1)
 {
-
+	mesh1.geoel.resize(mesh1.nelem,5);
+	for(int i=0;i<mesh1.nelem;i++)
+	{
+		int &p1 = mesh1.inpoel(i,0);
+		int &p2 = mesh1.inpoel(i,1);
+		int &p3 = mesh1.inpoel(i,2);
+		double &x1 = mesh1.coords(p1-1,0);
+		double &y1 = mesh1.coords(p1-1,1);
+		double &x2 = mesh1.coords(p2-1,0);
+		double &y2 = mesh1.coords(p2-1,1);	
+		double &x3 = mesh1.coords(p3-1,0);
+		double &y3 = mesh1.coords(p3-1,1);	
+		mesh1.geoel(i,0) = grid::pre_proc::el_jacobian(x1,x2,x3,y1,y2,y3); //push the area of the cell to the dstrtuct
+		//compute the coords of gauss poitns for each element and push the coords to geoel 
+	}
 }
 
 
@@ -345,6 +373,45 @@ double EOS::perf_gas(double rho, double E, double u, double v)
 	pressure = (const_properties::gamma-1)*rho*(E - 0.5*sqrt(u*u + v*v));
 	return pressure;
 }
+
+//subroutine to write out mesh for visualization only
+void grid::post_proc::writevtk_mesh(grid::mesh &mesh1,std::string file_name)
+{
+  std::ofstream file1(file_name);
+  if(file1.is_open())
+  {
+    file1 <<"# vtk DataFile Version 2.0\nfeflo\nASCII\nDATASET UNSTRUCTURED_GRID\nPOINTS "<<mesh1.npoin<<" double  "<<"\n";
+    for(int i = 0;i<mesh1.npoin;i++)
+    {
+      file1 <<mesh1.coords(i,0)<<" "<<mesh1.coords(i,1)<<" "<<"0 \n";
+    }
+    file1 <<"CELLS "<<mesh1.nelem<<" "<<mesh1.ntype*mesh1.nelem + mesh1.nelem<<"\n";
+    for(int k=0;k<mesh1.nelem;k++)
+    {
+      file1 <<mesh1.ntype<<" "<<mesh1.inpoel(k,0)-1<<" "<<mesh1.inpoel(k,1)-1<<" "<<mesh1.inpoel(k,2)-1<<"\n";
+    }
+    file1 << "CELL_TYPES "<<mesh1.nelem<<"\n";
+    for(int k=0;k<mesh1.nelem;k++)
+    {
+      file1<<mesh1.ntype+2<<"\n"; //VTK uses flag 5 to identify a triangle surface
+    }
+	}
+}
+
+double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
+{
+	return 0.5*(x1*(y2-y1) + x2*(y3-y1) + x3*(y1-y1)); 
+}
+
+double grid::pre_proc::len(double &x1,double &x2, double &y1, double &y2)
+{
+	return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
+}
+
+
+
+
+
 
 
 
