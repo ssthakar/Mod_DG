@@ -20,6 +20,9 @@
 #include "mMatrix3.h"
 
 
+//TODO put in some sort of assertion to make sure the order fo the functions in main are not random and one function cannot be called before or after it is supposed be called
+
+
 // values that are constant throughout the simulation go here
 namespace const_properties
 {
@@ -43,7 +46,6 @@ typedef mMatrix3<double> matrix3d;
 
 namespace reader 
 {
-
 	std::vector<std::vector<double>> readv(std::string s1);
 	matrix2d read(std::string s1,int ncols); //read in from .dat file and store in buffer(works for small meshes, needs overhaul for bigger ones)
 };
@@ -53,7 +55,7 @@ namespace reader
 //add weights for gauss points
 namespace grid
 {
-	class mesh 
+	class mesh  //main object
 	{
 		public:
 			int nelem; //number of grid cells without periodic boundary conditions
@@ -68,6 +70,8 @@ namespace grid
 			double A_min; //store in the smallest cell size for CFL condition and timestep calculation
 			int nmaxface; //total number of faces in the mesh including internal and boundary
 			int nintface; // number of internal faces
+			int func_count; // function counter to count which function has been executed
+			
 			//control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
 
@@ -96,28 +100,28 @@ namespace grid
 			
 			//mesh methods
 			mesh(std::string s1, std::string s2); // constructor reads in mesh file, and control file
-
 	};
-
-	// subroutines to generate data structures for mesh 
+	// subroutines for pre_processing of mesh
 	namespace pre_proc
 	{
-		void set_esup(grid::mesh &mesh1); //generates esup1 and esup2 
-		void set_esuel(grid::mesh &mesh1); //generates elsuel
-		void set_intfafce(grid::mesh &mesh1); //generate inter face connectivity
-		void set_bface(grid::mesh &mesh1);
-		void set_boun_geoface(grid::mesh &mesh1); //generates face data 
-		void set_geoel(mesh &mesh1); //generates element data
+		//functions to execute in order 
+		void set_esup(grid::mesh &mesh1); //generates esup1 and esup2 1 2 
+		void set_esuel(grid::mesh &mesh1); //generates elsuel 2 3 
+		void set_bface(grid::mesh &mesh1); //generate boundary face data  connectivity 3 4
+		void set_intface(grid::mesh &mesh1); // generate interface connectivity 4 - 5
+		void set_boun_geoface(grid::mesh &mesh1); //generates face data for all boundary faces
+		void set_int_geoface(grid::mesh &mesh1); //generates face data for all internal faces 
+		void set_geoel(grid::mesh &mesh1); //generates element data
+		void set_massMat(grid::mesh &mesh1);
 		double el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3); // calculate element jacobian 
-		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face 
+		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face
 	}
-
+	// subroutines and methdos for post processing
 	namespace post_proc
 	{
 		void writevtk_mesh(grid::mesh &mesh1,std::string file_name);
 	}
 }
-
 
 #endif 
 

@@ -1,10 +1,11 @@
 #include "mesh.h"
 #include "dg.h"
 #include <cmath>
+#include <numeric>
 #include <sstream>
 
 // TODO think of a better implementation using mmatrix class
-// stores data in a buffer of vectors of vectors
+// stores data in a buffer of vectors of vectors has horrible cache locality !!
 std::vector<std::vector<double>> reader::readv(std::string s)
 {
 	std::vector<std::vector<double>> v;
@@ -21,7 +22,7 @@ std::vector<std::vector<double>> reader::readv(std::string s)
 			std::string word;
 			while (line_stream >> word)
 			{
-				if (std::stringstream(word) >> val) // convers strings to doubles as well, TODO find better method to do this
+				if (std::stringstream(word) >> val) // converts strings to doubles as well, TODO find better method to do this
 				{
 					tempvec.push_back(val);
 				}
@@ -37,10 +38,10 @@ std::vector<std::vector<double>> reader::readv(std::string s)
 }
 
 // construtor for mesh class generates intpoel,coords and bface data sructures from mesh file 
-
 grid::mesh::mesh(std::string s1, std::string s2)
 {
 
+	func_count = 1;
 	std::vector<std::vector<double>> v = reader::readv(s1);
 	std::vector<std::vector<double>> c = reader::readv(s2);
 	// get all the int members of the class
@@ -52,7 +53,6 @@ grid::mesh::mesh(std::string s1, std::string s2)
 	neqns = ndimn+2;
 	ndegr = (c[0][0] + 1)*(c[0][0]+2)*0.5;
 	// for loop populate intpoel matrix
-
 	inpoel.resize(nelem, ntype); // init and give size to inpoel
 	for (int i = 0; i < nelem; i++)
 	{
@@ -85,11 +85,12 @@ grid::mesh::mesh(std::string s1, std::string s2)
 //sub to generate elemenst surrounding points linked list
 void grid::pre_proc::set_esup(grid::mesh &mesh1)
 {
+	assert(mesh1.func_count==1); // function must run after mesh constructor
+	mesh1.func_count = 2; //update func_counter
 	mesh1.esup2.resize(mesh1.npoin + 1, 1); // init matrix to store in index 
 	// this pass counts number of elements surrounding every point and stores that number in +1 index corresponding to that particular point
 	// for eg if point 9 has 6 elements around it, then
 	//  the number stored in index 10(for c++ it will be index 9) will be the number 6 after the first element pass
-	//
 	for (int i = 0; i < mesh1.nelem; i++) // loop over all elements
 	{
 		for (int j = 0; j < mesh1.ntype; j++) // loop over all the points of a node
@@ -128,7 +129,8 @@ void grid::pre_proc::set_esup(grid::mesh &mesh1)
 //sub to generate elements surrounding elements data
 void grid::pre_proc::set_esuel(grid::mesh &mesh1)
 {
-	// subroutine to generalte element surrounding element data structure
+	assert(mesh1.func_count == 2); //function must run after setting up esup data structure
+	mesh1.func_count = 3; //update func_count 
 	// init elsuel data structure
 	mesh1.esuel.resize(mesh1.nelem, mesh1.ntype); // number of elements x side for each element;
 	// loop over all elementsf
@@ -211,28 +213,11 @@ void grid::pre_proc::set_esuel(grid::mesh &mesh1)
 	}
 }
 
-// subroutine to generate the inter face connectivity matrix 
-
-	//FORMAT FOR INTFACE
-	// (ip1 | ip2 |cell on left | cell on right| face flag)
-	// 0 for internal face
-	// 2 for inlet or outlet face 
-	// 4 for wall face  
-	//Note on convetion
-	/*
-
-	_______p2
-  \     /\
-	 \ L /  \
-		\	/ R  \
-		 p1_____\
-
-	*/ 
-
 //subroutine to update and complete the bface data structuren initiated in the mesh constructor
-
 void grid::pre_proc::set_bface(grid::mesh &mesh1)
 {
+	assert(mesh1.func_count == 3); //function must run after setting up elsuel
+	mesh1.func_count = 4; //update function counter 
 	int bf = 0; //counter for boundary face number;
 	for(int i=0;i<mesh1.nelem;i++) //loop through all the elements 
 	{
@@ -261,9 +246,11 @@ void grid::pre_proc::set_bface(grid::mesh &mesh1)
 	}
 } 
 
-
-void grid::pre_proc::set_intfafce(grid::mesh &mesh1)
+// computes the interface connectivity matrix
+void grid::pre_proc::set_intface(grid::mesh &mesh1)
 {
+	assert(mesh1.func_count == 4); //function must run after bface has been setting
+	mesh1.func_count = 5; //update function counter 
 	mesh1.nmaxface = (3 * mesh1.nelem + mesh1.nbface) / 2;
 	mesh1.nintface = mesh1.nmaxface - mesh1.nbface;
 	mesh1.intface.resize(mesh1.nintface, 4); // init intface matrix
@@ -302,6 +289,7 @@ void grid::pre_proc::set_intfafce(grid::mesh &mesh1)
 //sub to generate face data needed for DG formulation
 void grid::pre_proc::set_boun_geoface(mesh &mesh1)
 {
+
 	//format for geoface data structure (nx ny G1x G1y G2x G2y len of face)
 
 	//TODO add fucntionality to find out the size of the geoface vector depending on ngauss
@@ -344,7 +332,7 @@ void grid::pre_proc::set_boun_geoface(mesh &mesh1)
 
 // sub to compute element data like shape functions etc
 //
-//geoel ith row (jacobian | g1x | g1y | g2x | g2y | g3x | g3y |)
+//geoel ith row (jacobian | m1 | m2 | m3|  g1x | g1y | g2x | g2y | g3x | g3y |)
 //
 void grid::pre_proc::set_geoel(mesh &mesh1)
 {
@@ -365,16 +353,80 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 	}
 }
 
-
-//computes the pressure given values of properties
-double EOS::perf_gas(double rho, double E, double u, double v)
+// loop over all the elements and compute the mass matrix componenets and store in geoel array 
+void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 {
-	double pressure;
-	pressure = (const_properties::gamma-1)*rho*(E - 0.5*sqrt(u*u + v*v));
-	return pressure;
+	assert(mesh1.geoel.getnrows()>1); //make sure geoel is inited 
+	//loop over all elements 
+	for(int i=0;i<mesh1.nelem;i++)
+	{
+		//get cell data from current mesh object 
+		int &p1 = mesh1.inpoel(i,0);
+		int &p2 = mesh1.inpoel(i,1);
+		int &p3 = mesh1.inpoel(i,2);
+		double &x1 = mesh1.coords(p1-1,0);
+		double &x2 = mesh1.coords(p2-1,0);
+		double &x3 = mesh1.coords(p3-1,0);
+		double &y1 = mesh1.coords(p1-1,1);
+		double &y2 = mesh1.coords(p2-1,1);
+		double &y3 = mesh1.coords(p3-1,1);
+		//get centroids of the triangle 
+		double xc = (x1 + x2 + x3)/3;
+		double yc = (y1 + y2 + y3)/3;
+		//get delta_x and delta_y
+		double delta_x = std::max({x1,x2,x3})/2 - std::min({x1,x2,x3})/2;
+		double delta_y = std::max({y1,y2,y3})/2 - std::min({y1,y2,y3})/2;
+		//get area of the triangle
+		double A = grid::pre_proc::el_jacobian(x1,x2,x3,y1,y2,y3);
+		// loop to calculate the upper diagonal of the mass matrix 3 for P1
+		//vectors needed to simplify the large mathematical equation 
+		std::vector<double> X = {x1,x2,x3};
+		std::vector<double> Y = {y1,y2,y3};
+		std::vector<double> Xc = {xc,xc,xc};
+		std::vector<double> Yc = {yc,yc,yc};
+		std::vector<double> Y1 = {y2,y1,y1};
+		std::vector<double> Y2 = {y3,y3,y2};
+		std::vector<double> Y31 = {y2,y3,y1};
+		std::vector<double> X11 = {x2,x3,x1};	
+		for(int j = 0;j<3;j++)
+		{
+			switch(j)
+			{
+				case 0:
+				{
+						//compute m1 and push to location in geoel
+						double term1 = 0.0833*(std::inner_product(X.begin(),X.begin(),X.end(),0.0)+std::inner_product(X.begin(),X.end(),X11.begin(),0.0));
+						double term2 = -0.3333*(std::inner_product(X.begin(),X.end(),Xc.begin(),0.0));
+						double m1 = term1 + term2 + 0.5*xc*yc;
+						mesh1.geoel(i,1) = 2*A*m1/(delta_x*delta_x);
+						break;
+				}
+				case 1:
+				{
+						//compute m2 and push to location in geoel
+						double m2;
+						double term1 = 0.0833*std::inner_product(X.begin(),X.end(),Y.begin(),0.0);
+						double term2 = 0.0417*std::inner_product(X.begin(),X.end(),Y1.begin(),0.0)+0.0417*std::inner_product(X.begin(),X.end(),Y2.begin(),0.0);
+						double term3 = -0.1667*(std::inner_product(Xc.begin(),Xc.end(),Y.begin(),0.0)+std::inner_product(Y.begin(),Y.end(),Xc.begin(),0.0));
+						m2 = term1+term2+term3+0.5*xc*yc;
+						mesh1.geoel(i,2) = 2*A*m2/(delta_x*delta_y);
+						break;
+				}
+				case 2:
+				{
+					//compute m3  and push to locaiton in geoel 
+					double term1 = 0.0833*(std::inner_product(Y.begin(),Y.begin(),Y.end(),0.0)+std::inner_product(Y.begin(),Y.end(),Y31.begin(),0.0));
+					double term2 = -0.3333*(std::inner_product(Y.begin(),Y.end(),Yc.begin(),0.0));
+					double m3 = term1 + term2 + 0.5*xc*yc;
+					mesh1.geoel(i,3) = 2*A*m3/(delta_y*delta_y);
+					break;
+				}
+			}
+		}
+	}
 }
 
-//subroutine to write out mesh for visualization only
+// function to write out mesh in .vtk format for paraview to read and visualize
 void grid::post_proc::writevtk_mesh(grid::mesh &mesh1,std::string file_name)
 {
   std::ofstream file1(file_name);
@@ -398,20 +450,24 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1,std::string file_name)
 	}
 }
 
-double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
+//computes the pressure given values of properties
+double EOS::perf_gas(double rho, double E, double u, double v)
 {
-	return 0.5*(x1*(y2-y1) + x2*(y3-y1) + x3*(y1-y1)); 
+	double pressure;
+	pressure = (const_properties::gamma-1)*rho*(E - 0.5*sqrt(u*u + v*v));
+	return pressure;
 }
 
+//computes the jacobian for a triangular element 
+double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
+{
+	return 0.5*(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)); 
+}
+
+// computes the length of the 2d face
 double grid::pre_proc::len(double &x1,double &x2, double &y1, double &y2)
 {
 	return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
 }
-
-
-
-
-
-
 
 
