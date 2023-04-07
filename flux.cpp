@@ -1,31 +1,65 @@
 #include "mesh.h"
+#include "dg.h"
 
-//format for intface row for a face with index i 
-// (ip1 | ip2 |cell on left | cell on right)
-matrix2d Flux::fvRoe2d(mesh &mesh1, int i)
+
+std::vector<double> Flux::Roe::Cons2Prim(std::vector<double> &state)
 {
-	matrix2d flux(mesh1.neqns);//init matrix to store in flux, return this 
-	assert(mesh1.ndegr == 0); //this function is only for finite volume 
-	//get the element numbers on the right and left intface 
-	int &L = mesh1.intface(i,2);
-	int &R  = mesh1.intface(i,3);
-	//format of solution storage for element L or R 
-	// fv_U(i,) = rho | U | V | E 
-	// declare variables needed to compute flux
-	//double rho_R,u_L,u_R,v_L,v_R,E_L,E_R,p;
-	double & rho_L = mesh1.fv_U(L,0); //density left state
-	double & rho_R = mesh1.fv_U(R,0);
-	double & u_L = mesh1.fv_U(L,1); //x component left state 
-	double & u_R = mesh1.fv_U(R,1);
-	double & v_L = mesh1.fv_U(L,2);
-	double & v_R = mesh1.fv_U(R,2);
-	double & E_L = mesh1.fv_U(L,3); //energy left state 
-	double & E_R = mesh1.fv_U(R,3);
-	//compute the pressure for both states of the solution;
-	double p_L = EOS::perf_gas(rho_L,E_L,u_L,v_L);
-	double p_R = EOS::perf_gas(rho_R,E_R,u_R,v_R);
-	double R_LR = sqrt(rho_L/rho_R);
-	double rho_LR = R_LR*rho_L;
+	std::vector<double> Prim;
+	Prim.resize(5); // add one place holder for pressure computation 
+	Prim[0] = state[0]; //density
+	Prim[1] = state[1]/state[0]; //u or x vel 
+	Prim[2] = state[2]/state[0]; //v or y vel 
+	Prim[3] = state[3]/state[0]; // total energy e
+	Prim[4] = EOS::perf_gas(state); // calculate and store pressure 
+	return Prim;
+}
+
+
+//function to compute the Roe_averaged variables 
+std::vector<double> Flux::Roe::Roe_avg(std::vector<double> &L_prim, std::vector<double> &R_prim) //take in prim vars 
+{
+	std::vector<double> Ravg;
+	Ravg.resize(4); // this is only for 2d not considering general case 
+	double hL = (L_prim[0]*L_prim[3] + L_prim[4])/L_prim[0]; //calculate the enthalpy for the left side
+	double hr = (R_prim[0]*R_prim[3] + R_prim[4])/R_prim[0]; //calculate the enthalpy for the right side 
+	return Ravg;
+}
+
+
+//function to compute the wave speed 
+std::vector<double> Flux::Roe::wave_speed(std::vector<double> &vec)
+{
+	std::vector<double> ws;
+	return ws;
+}
+
+//function to compute the wave strength given 
+std::vector<double> Flux::Roe::wave_strength(std::vector<double> &vec)
+{
+	std::vector<double> wstrngth;
+	return wstrngth;
+}
+// function to compute the Roes average flux for ith internal face
+// takes in comnined vector of left and right conservative variables to compute the flux at Guass point
+//                       rhoL rhoUL rhoVL rhoEL rhoR  rhoUR	 rhoVR 	rhoER
+//format for arg vector (vl1  vl2   vl3   vl4   vr1   vr2    vr3    vr4) //conservative variable vector
+//											 0		1	 	  2		  3	    4		  5		   6		  7	
+//
+matrix2d Flux::Roe::DGRoe2d(grid::mesh &mesh1,std::vector<double> &LR)
+{
+	//assert(args.size() == 2*mesh1.neqns); //make sure the right vector is passed toa the function
+	matrix2d flux(mesh1.neqns,1); //init empty container to store in flux at interface
+	//compute roe averaged quantities from conservative vars
+	std::vector<double> Left_state(LR.begin(),LR.begin()+4);
+	std::vector<double> Right_state(LR.begin()+4, LR.end());
+	std::vector<double> PrimL = Flux::Roe::Cons2Prim(Left_state); //get primary variables on the left  
+	std::vector<double> PrimR = Flux::Roe::Cons2Prim(Right_state); // get primary variables on the right
+	//compute enthalpy for use in Roes averages
+	//compute Roes average vars
+	//compute wave speeds
+	//compute wave strengths
+	// for loop to compute flux at interface 
+	//
 	
 	return flux;
 
