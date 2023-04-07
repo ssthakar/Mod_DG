@@ -24,16 +24,6 @@
 
 
 // values that are constant throughout the simulation go here
-namespace const_properties
-{
-	const double gamma = 1.4;
-	const double lim_zero = 1e-15;
-}
-namespace EOS
-{
-	//equation of state for a monoatomic_gas;
-	inline double perf_gas(double rho, double E,double u,double v); // compute the pressure from the equation of state
-}
 
 // convenient typedefs for ease of use
 // 2d arrays 
@@ -43,6 +33,18 @@ typedef mMatrix2<float> matrix2f;
 // 3d arrays
 typedef mMatrix3<int> matrix3i;
 typedef mMatrix3<double> matrix3d;
+
+
+namespace const_properties
+{
+	const double gamma = 1.4;
+	const double lim_zero = 1e-15;
+}
+namespace EOS
+{
+	//equation of state for a monoatomic_gas;
+	double perf_gas(matrix2d &cons_var); // compute the pressure from the equation of state
+}
 
 namespace reader 
 {
@@ -92,7 +94,7 @@ namespace grid
 			matrix2d geoel;// data structure to store in domain data for each element
 				
 			//solution containers
-			matrix3d U; //3d array that stores in the solution unknowns. for each variable
+			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable
 			matrix3d rhsel; //3d array to store rhs for each element
 			
 			// fv_U(i,) = rho | U | V | E 

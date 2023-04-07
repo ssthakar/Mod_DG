@@ -81,6 +81,10 @@ grid::mesh::mesh(std::string s1, std::string s2)
 		bface(i,4) = v[i+nelem+2*npoin+12][3];
 	}
 }
+//end constructor 
+
+
+
 
 //sub to generate elemenst surrounding points linked list
 void grid::pre_proc::set_esup(grid::mesh &mesh1)
@@ -125,6 +129,9 @@ void grid::pre_proc::set_esup(grid::mesh &mesh1)
 	}
 	mesh1.esup2(mesh1.npoin, 0) = storage_req;
 }
+//endsub
+
+
 
 //sub to generate elements surrounding elements data
 void grid::pre_proc::set_esuel(grid::mesh &mesh1)
@@ -212,6 +219,11 @@ void grid::pre_proc::set_esuel(grid::mesh &mesh1)
 		}
 	}
 }
+//end sub 
+
+
+
+
 
 //subroutine to update and complete the bface data structuren initiated in the mesh constructor
 void grid::pre_proc::set_bface(grid::mesh &mesh1)
@@ -245,8 +257,11 @@ void grid::pre_proc::set_bface(grid::mesh &mesh1)
 		}
 	}
 } 
+//endsub 
 
-// computes the interface connectivity matrix
+
+
+//sub to compute and generate the interface connectivity matrix
 void grid::pre_proc::set_intface(grid::mesh &mesh1)
 {
 	assert(mesh1.func_count == 4); //function must run after bface has been setting
@@ -266,10 +281,8 @@ void grid::pre_proc::set_intface(grid::mesh &mesh1)
 				{
 					mesh1.intface(m, 0) = mesh1.inpoel(i, j);
 					mesh1.intface(m, 1) = mesh1.inpoel(i, j + 1);
-					mesh1.intface(m, 2) = e;
-					mesh1.intface(m, 3) = i + 1;
-					//mesh1.intface(m,4) = 0; //flag for internal face 
-					//m++;
+					mesh1.intface(m, 2) = e; //left cell  i_e
+					mesh1.intface(m, 3) = i + 1; //right cell j_e 
 				}
 				else
 				{
@@ -277,17 +290,18 @@ void grid::pre_proc::set_intface(grid::mesh &mesh1)
 					mesh1.intface(m, 1) = mesh1.inpoel(i, 0);
 					mesh1.intface(m, 2) = e;
 					mesh1.intface(m, 3) = i + 1;
-					//mesh1.intface(m,4) = 0; //flag for internal face 
 				}
 				m++;
 			}
 		}
 	} 
 }
+//endsub 
+
 
 
 //sub to generate face data needed for DG formulation
-void grid::pre_proc::set_boun_geoface(mesh &mesh1)
+void grid::pre_proc::set_int_geoface(mesh &mesh1)
 {
 
 	//format for geoface data structure (nx ny G1x G1y G2x G2y len of face)
@@ -298,7 +312,7 @@ void grid::pre_proc::set_boun_geoface(mesh &mesh1)
 	// generate geoface data structure using intface, intpoel, coords 
 	//mesh1.geoface.resize(mesh1.nmaxface,mesh1.ngauss_boun*2+3);
 	mesh1.geoface.resize(mesh1.nmaxface,7);
-	for(int i=0;i<mesh1.nmaxface;i++)
+	for(int i=0;i<mesh1.nintface;i++)
 	{
 		double nx,ny;// components of the outward area normal vector
 		int ip1 = mesh1.intface(i,0); //1st point on the face
@@ -328,6 +342,8 @@ void grid::pre_proc::set_boun_geoface(mesh &mesh1)
 		mesh1.geoface(i,6) = grid::pre_proc::len(p1x,p2x,p1y,p2y); 
 	}
 }
+//endsub 
+
 
 
 // sub to compute element data like shape functions etc
@@ -352,8 +368,12 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 		//compute the coords of gauss poitns for each element and push the coords to geoel 
 	}
 }
+//endsub 
 
-// loop over all the elements and compute the mass matrix componenets and store in geoel array 
+
+
+
+// sub tom compute the mass matrix componenets and store in initiated geoel array 
 void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 {
 	assert(mesh1.geoel.getnrows()>1); //make sure geoel is inited 
@@ -392,32 +412,38 @@ void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 		{
 			switch(j)
 			{
+				// B2B2 
 				case 0:
 				{
 						//compute m1 and push to location in geoel
-						double term1 = 0.0833*(std::inner_product(X.begin(),X.begin(),X.end(),0.0)+std::inner_product(X.begin(),X.end(),X11.begin(),0.0));
-						double term2 = -0.3333*(std::inner_product(X.begin(),X.end(),Xc.begin(),0.0));
-						double m1 = term1 + term2 + 0.5*xc*yc;
+						
+						double term11 = 0.0833*(std::inner_product(X.begin(),X.end(),X.begin(),0.0)+std::inner_product(X.begin(),X.end(),X11.begin(),0.0));
+						double term12 = 0.3333*(std::inner_product(X.begin(),X.end(),Xc.begin(),0.0));
+						double m1 = term11 - term12 + 0.5*xc*xc;
 						mesh1.geoel(i,1) = 2*A*m1/(delta_x*delta_x);
 						break;
 				}
+
+				//B2B3
 				case 1:
 				{
 						//compute m2 and push to location in geoel
-						double m2;
-						double term1 = 0.0833*std::inner_product(X.begin(),X.end(),Y.begin(),0.0);
-						double term2 = 0.0417*std::inner_product(X.begin(),X.end(),Y1.begin(),0.0)+0.0417*std::inner_product(X.begin(),X.end(),Y2.begin(),0.0);
-						double term3 = -0.1667*(std::inner_product(Xc.begin(),Xc.end(),Y.begin(),0.0)+std::inner_product(Y.begin(),Y.end(),Xc.begin(),0.0));
-						m2 = term1+term2+term3+0.5*xc*yc;
+					
+						double term21 = 0.0833*std::inner_product(X.begin(),X.end(),Y.begin(),0.0);
+						double term22 = 0.0417*std::inner_product(X.begin(),X.end(),Y1.begin(),0.0)+0.0417*std::inner_product(X.begin(),X.end(),Y2.begin(),0.0);
+						double term23 = -0.1667*(std::inner_product(Xc.begin(),Xc.end(),Y.begin(),0.0)+std::inner_product(Y.begin(),Y.end(),Xc.begin(),0.0));
+						double m2 = term21+term22+term23+0.5*xc*yc;
 						mesh1.geoel(i,2) = 2*A*m2/(delta_x*delta_y);
 						break;
 				}
+
+				//B3B3
 				case 2:
 				{
 					//compute m3  and push to locaiton in geoel 
-					double term1 = 0.0833*(std::inner_product(Y.begin(),Y.begin(),Y.end(),0.0)+std::inner_product(Y.begin(),Y.end(),Y31.begin(),0.0));
-					double term2 = -0.3333*(std::inner_product(Y.begin(),Y.end(),Yc.begin(),0.0));
-					double m3 = term1 + term2 + 0.5*xc*yc;
+					double term31 = 0.0833*(std::inner_product(Y.begin(),Y.end(),Y.begin(),0.0)+std::inner_product(Y.begin(),Y.end(),Y31.begin(),0.0));
+					double term32 = -0.3333*(std::inner_product(Y.begin(),Y.end(),Yc.begin(),0.0));
+					double m3 =term31 + term32 + 0.5*yc*yc;
 					mesh1.geoel(i,3) = 2*A*m3/(delta_y*delta_y);
 					break;
 				}
@@ -425,8 +451,13 @@ void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 		}
 	}
 }
+//endsub 
 
-// function to write out mesh in .vtk format for paraview to read and visualize
+
+
+
+
+// sub to  to write out mesh in .vtk format for paraview to read and visualize
 void grid::post_proc::writevtk_mesh(grid::mesh &mesh1,std::string file_name)
 {
   std::ofstream file1(file_name);
@@ -449,22 +480,25 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1,std::string file_name)
     }
 	}
 }
+//endsub 
 
-//computes the pressure given values of properties
-double EOS::perf_gas(double rho, double E, double u, double v)
+//works for 2d only for now
+//method to computes the pressure given values of properties
+double EOS::perf_gas(matrix2d &cons_var)
 {
+
 	double pressure;
-	pressure = (const_properties::gamma-1)*rho*(E - 0.5*sqrt(u*u + v*v));
+	pressure = (const_properties::gamma-1)*cons_var(0,0)*(cons_var(0,0) - 0.5/cons_var(0,0)*(cons_var(1,0)*cons_var(1,0) + cons_var(2,0)*cons_var(2,0)));
 	return pressure;
 }
 
-//computes the jacobian for a triangular element 
+//this method computes the jacobian for a triangular element 
 double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
 {
 	return 0.5*(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)); 
 }
 
-// computes the length of the 2d face
+// this method computes the length of the 2d face
 double grid::pre_proc::len(double &x1,double &x2, double &y1, double &y2)
 {
 	return sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));

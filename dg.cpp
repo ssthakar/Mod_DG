@@ -31,6 +31,38 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
 // sub to push the contribution of domain integral to rhsel
 void DG::rhsdomn(grid::mesh &mesh1)
 {
-
+	
 }
 //endsub 
+
+
+//constructor for the flux object
+FDS::RoeFlux::RoeFlux(matrix2d &Ul, matrix2d &Ur, double &nx, double &ny)
+{
+
+	assert(Ul.getncols() ==1 and Ur.getncols() ==1);
+	double Pl = EOS::perf_gas(Ul);
+	double Pr = EOS::perf_gas(Ur);
+	avg.resize(5,1); //init container
+	double Rij = sqrt(Ur(0,0)/Ul(0,0));
+	avg(0,0) = Rij*Ul(0,0);
+	avg(1,0) = (Rij*Ur(1,0)/Ur(0,0)+Ul(1,0)/Ul(0,0))/(1+Rij);
+	avg(2,0) = (Rij*Ur(2,0)/Ur(0,0)+Ul(2,0)/Ul(0,0))/(1+Rij);
+	avg(3,0) = (Rij*(Ur(3,0)+Pr)/Ur(0,0) + (Ul(3,0) + Pl)/Ul(0,0))/(Rij+1);
+	avg(4,0) = (const_properties::gamma-1)*(avg(3,0) - 0.5*(avg(1,0)*avg(1,0) + avg(2,0)*avg(2,0)));
+}
+
+void FDS::RoeFlux::set_lamda()
+{
+
+}
+
+void FDS::RoeFlux::set_W_amp()
+{
+
+}
+
+void FDS::RoeFlux::flux_out()
+{
+
+}
