@@ -51,6 +51,7 @@ class mMatrix2
 	  void setval(int row, int col, T val);
     int getnrows();
     int getncols();
+    int size(); //get the size of the matrix 
 
     //operator overloads
 	  T &operator()(const int nrows, const int ncols); //() return by reference overload to access and assign
@@ -229,7 +230,11 @@ int mMatrix2<T>::getncols()
 {
   return m_cols;
 }
-
+template<class T> //mainly used in my code to check if some data struct has been initialized using the resize function
+int mMatrix2<T>::size()
+{
+  return m_rows*m_cols;
+}
 /*______________________________________________________________________________________________________*/
 
 

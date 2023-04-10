@@ -1,5 +1,5 @@
 a.out: test.o mesh1.o dg.o mesh.h
-	g++ -pg mesh1.o test.o 
+	g++ -O1  mesh1.o test.o 
 
 test.o: mesh1.cpp mesh.h
 	g++ -c test.cpp

@@ -16,25 +16,20 @@
 #include <algorithm>
 #include <cmath>
 #include <typeinfo>
-#include "mMatrix.h"
-#include "mMatrix3.h"
+#include "mMatrix3.h" //for 3d storage container 
+#include "vmatrix2.h" //for 2d storage container 
 
-
-//TODO put in some sort of assertion to make sure the order fo the functions in main are not random and one function cannot be called before or after it is supposed be called
-
-
-// values that are constant throughout the simulation go here
 
 // convenient typedefs for ease of use
 // 2d arrays 
-typedef mMatrix2<int> matrix2i;
-typedef mMatrix2<double> matrix2d;
-typedef mMatrix2<float> matrix2f;
+typedef vmatrix2<int> matrix2i;
+typedef vmatrix2<double> matrix2d;
+typedef vmatrix2<float> matrix2f;
 // 3d arrays
 typedef mMatrix3<int> matrix3i;
 typedef mMatrix3<double> matrix3d;
 
-
+//thermophysical constants 
 namespace const_properties
 {
 	const double gamma = 1.4;
@@ -49,7 +44,6 @@ namespace EOS
 namespace reader 
 {
 	std::vector<std::vector<double>> readv(std::string s1);
-	matrix2d read(std::string s1,int ncols); //read in from .dat file and store in buffer(works for small meshes, needs overhaul for bigger ones)
 };
 
 
@@ -57,6 +51,7 @@ namespace reader
 //add weights for gauss points
 namespace grid
 {
+  // mesh class object 
 	class mesh  //main object
 	{
 		public:
@@ -87,22 +82,27 @@ namespace grid
 			matrix2i intface; //interface connectivity matrix 
 			matrix2d geoface; // data structure to store in boundary face data
 			matrix2d int_geoface; // data structure to store in internal face data
-
+      matrix2d boun_geoface; // data struct to store in face data for boundary faces only
+    
 			//store in jacobian, shape function integrals guass point locations 
 			matrix2d domn_weights; // vectors to store in domain weights depending on number of gauss points used 
 			matrix2d line_weights; //vector to store in weights for the boundary integral depending on number of guass points used
 			matrix2d geoel;// data structure to store in domain data for each element
 				
 			//solution containers
-			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable
-			matrix3d rhsel; //3d array to store rhs for each element
+      //storage order nelem 
+      // format for storage of  unkel(nelem,n_consvar,n_coeff)
+			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
+			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
 			
 			// fv_U(i,) = rho | U | V | E 
 			matrix2d fv_U; //2d array to store in solution for P(0) DG finite volume
 			
 			//mesh methods
-			mesh(std::string s1, std::string s2); // constructor reads in mesh file, and control file
+			mesh(std::string s1, std::string s2); // advance function counter 0-1 constructor reads in mesh file, and control file
 	};
+
+
 	// subroutines for pre_processing of mesh
 	namespace pre_proc
 	{
@@ -114,7 +114,7 @@ namespace grid
 		void set_boun_geoface(grid::mesh &mesh1); //generates face data for all boundary faces
 		void set_int_geoface(grid::mesh &mesh1); //generates face data for all internal faces 
 		void set_geoel(grid::mesh &mesh1); //generates element data
-		void set_massMat(grid::mesh &mesh1);
+		void set_massMat(grid::mesh &mesh1); 
 		double el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3); // calculate element jacobian 
 		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face
 	}
@@ -124,6 +124,7 @@ namespace grid
 		void writevtk_mesh(grid::mesh &mesh1,std::string file_name);
 	}
 }
+//end of grid namespace 
 
 #endif 
 
