@@ -34,6 +34,7 @@ namespace const_properties
 {
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
+	const double CFL = 0.95; //CFL to use in the local time stepping for pseudo transient integration
 }
 namespace EOS
 {

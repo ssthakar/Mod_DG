@@ -1,4 +1,4 @@
-#include "dg.h"
+#include "dg.h" 
 #include "mesh.h"
 
 
@@ -16,12 +16,46 @@ matrix2d DG::U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i) // func
 }
 
 
-//function to get standard flux from conservative variable 
-matrix2d DG::F_at_poin(matrix2d &U) //used in domain integral only
+//function to get x-direction flux vector from state  
+matrix2d DG::Fx(matrix2d &U) //used in domain integral only
 {
-	matrix2d Flux(4,1);
-	return Flux;
+	matrix2d fx(4,1);
+	fx(0,0) = U(1,0); //rho U
+  fx(1,0) = U(1,0)*U(1,0)/U(0,0)  + EOS::perf_gas(U); 
+  fx(2,0) = U(1,0)*U(2,0)/U(0,0);
+  fx(3,0) = (U(3,0)+EOS::perf_gas(U))*U(1,0)/U(0,0);
+	return fx;
 }
+//function to get x-direction flux vector from state  
+matrix2d DG::Fy(matrix2d &U) //used in domain integral only
+{
+	matrix2d fy(4,1);
+	fy(0,0) = U(2,0); //rho U
+  fy(1,0) = U(1,0)*U(2,0)/U(0,0);
+  fy(2,0) = U(2,0)*U(2,0)/U(0,0)  + EOS::perf_gas(U); 
+  fy(3,0) = (U(3,0)+EOS::perf_gas(U))*U(2,0)/U(0,0);
+	return fy;
+}
+
+
+void DG::rhsdomn(grid::mesh &mesh1) //pass reference to the mesh object
+{
+  for(int i=0;i<mesh1.nelem;i++) //loop over all elems
+  {
+    for(int j=0;j<mesh1.ngauss_domn;j++) //loop over all gauss points
+    {
+      double gx,gy; //get gauss coorsd of current gaus point
+      matrix2d U = DG::U_at_poin(mesh1, gx,gy,i); // get solution at current gauss point
+      matrix2d fx,fy;
+      fx = DG::Fx(U); //get flux function at current gauss point
+      fy = DG::Fy(U);
+      //get basis function derivatives at current gauss point
+      double B2x,B2y,B3x,B3y;
+      mesh1.rhsel(i,0,0) = fx(0,0)*B2x +fy(0,0)*B2y + mesh1.rhsel(i,0,0);
+    }
+  }
+}
+
 
 // sub to push the contribution of the boundary integral to rhsel from bface only
 void DG::rhsboun_bface(grid::mesh &mesh1)
@@ -39,7 +73,7 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
 // endsub
 
 
-
+//TODO implement correct gauss coords rght now using nx and ny which is not correct 
 // sub to compute the contribution of the boundary integral at interfaces to RHSel from internal faces
 void DG::rhsboun_iface(grid::mesh &mesh1) 
 {
@@ -66,21 +100,6 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
 }
 // endsub
 
-// sub to push the contribution of domain integral to rhsel
-void DG::rhsdomn(grid::mesh &mesh1)
-{
-  for (int i = 0; i < mesh1.nelem; i++) // loop through all the elements
-  {
-    for (int j = 0; j < mesh1.ngauss_domn; j++) // loop through all the domain gauss points
-    {
-      // get standard flux at current gauss point from conservative vars
-      // get shape function derivatives at current point
-      // compute the numerical integral vectors
-      // push contribution to rhses
-    }
-  }
-}
-// endsub
 
 /*---------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 //  imppmentation of Roes averaged flux, constructs flux object and has a method that returns the dissipative flux vector to be used in the rhsboun_iface subroutine
@@ -163,3 +182,16 @@ matrix2d FDS::RoeFlux::flux_intface()
   return intface_flux; // returns the dissipative flux , this is not the flux function
 }
 // end class definition
+
+
+
+//function to calculate local time step for cell i 
+double ddt::local_ts(grid::mesh &mesh1, int &i)
+{
+	double delta_T;
+	
+
+	return delta_T;
+}
+
+

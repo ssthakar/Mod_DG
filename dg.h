@@ -4,7 +4,8 @@
 
 namespace DG
 {
-	matrix2d F_at_poin(matrix2d &Ul); //get flux from conservative variables  (standard flux nothing fancy)
+	matrix2d Fx(matrix2d &state);// get x direction flux from conservative variables  (standard flux nothing fancy)
+	matrix2d Fy(matrix2d &state);
 	matrix2d U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i); // get solution at point  given the point co-ordinates
 	matrix2d get_state(grid::mesh &mesh1, int &i);						  // get conservative state vars of a particular elem
 	void init_field(grid::mesh &mesh1);
@@ -54,7 +55,7 @@ namespace FVS
 
 namespace ddt // time marching methods for local cells
 {
-	double calc_deltaT(grid::mesh &mesh1); // method to calculate the allowed delta T for all cells (local time step)
+	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace explct
 	{
 		matrix2d fwd_euler(grid::mesh &mesh1, double &delta);
