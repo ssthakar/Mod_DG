@@ -2,8 +2,6 @@
 #include "dg.h"
 #include <cmath>
 
-// TODO think of a better implementation using mmatrix class
-// stores data in a buffer of vectors of vectors has horrible cache locality !!
 std::vector<std::vector<double>> reader::readv(std::string s)
 {
 	std::vector<std::vector<double>> v;
@@ -20,7 +18,7 @@ std::vector<std::vector<double>> reader::readv(std::string s)
 			std::string word;
 			while (line_stream >> word)
 			{
-				if (std::stringstream(word) >> val) // converts strings to doubles as well, TODO find better method to do this
+				if (std::stringstream(word) >> val)
 				{
 					tempvec.push_back(val);
 				}
@@ -50,6 +48,10 @@ grid::mesh::mesh(std::string s1, std::string s2)
 	nbface = v[7][2];
 	neqns = ndimn + 2;
 	ndegr = (c[0][0] + 1) * (c[0][0] + 2) * 0.5;
+  ngauss_boun = c[1][0];
+  ngauss_domn = c[2][0];
+  domweight = c[3][0];
+  bounweight = c[4][0];
 	// for loop populate intpoel matrix
 	inpoel.init(nelem, ntype); // init and give size to inpoel
 	for (int i = 0; i < nelem; i++)
@@ -69,7 +71,7 @@ grid::mesh::mesh(std::string s1, std::string s2)
 	}
 	// bface format
 	//  ith row (ip1 ip2 host el ghost el face_flag)
-	bface.init(nbface, 5); // init bface matrix and give size
+	bface.init(nbface, 5); 
 	for (int i = 0; i < nbface; i++)
 	{
 		for (int j = 0; j < 2; j++)
@@ -282,40 +284,94 @@ void grid::pre_proc::set_intface(grid::mesh &mesh1)
 					mesh1.intface(m, 3) = i + 1;
 				}
 				m++;
-			}
+ 			}
 		}
 	}
 }
 // endsub
-// 
+
+
+// sub to compute element data 
+void grid::pre_proc::set_geoel(mesh &mesh1)
+{
+  assert(mesh1.func_count == 5);
+  mesh1.func_count = 6;
+	mesh1.geoel.init(mesh1.nelem, 14);
+	for (int i = 0; i < mesh1.nelem; i++)
+	{
+		int &p1 = mesh1.inpoel(i, 0);
+		int &p2 = mesh1.inpoel(i, 1);
+		int &p3 = mesh1.inpoel(i, 2);
+		double &x1 = mesh1.coords(p1 - 1, 0);
+		double &y1 = mesh1.coords(p1 - 1, 1);
+		double &x2 = mesh1.coords(p2 - 1, 0);
+		double &y2 = mesh1.coords(p2 - 1, 1);
+		double &x3 = mesh1.coords(p3 - 1, 0);
+		double &y3 = mesh1.coords(p3 - 1, 1);
+		mesh1.geoel(i, 0) = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3);
+		mesh1.geoel(i, 1) = (x1 + x2 + x3) / 3; //xc  
+		mesh1.geoel(i, 2) = (y1 + y2 + y3) / 3; //yc
+		mesh1.geoel(i,3) = std::max({x1,x2,x3}) - std::min({x1,x2,x3}); // delta_x
+		mesh1.geoel(i,4) = std::max({y1,y2,y3}) - std::min({y1,y2,y3}); //delta_y 
+		mesh1.geoel(i,5) = mesh1.coords(p1-1,0)*0.5 + mesh1.coords(p2-1,0)*0.5; //guass points for domain integral 
+		mesh1.geoel(i,6) = mesh1.coords(p1-1,1)*0.5 + mesh1.coords(p2-1,1)*0.5;
+		mesh1.geoel(i,7) = mesh1.coords(p2-1,0)*0.5 + mesh1.coords(p3-1,0)*0.5;
+		mesh1.geoel(i,8) = mesh1.coords(p2-1,1)*0.5 + mesh1.coords(p3-1,1)*0.5;
+		mesh1.geoel(i,9) = mesh1.coords(p3-1,0)*0.5 + mesh1.coords(p1-1,0)*0.5;
+		mesh1.geoel(i,10) = mesh1.coords(p3-1,1)*0.5 + mesh1.coords(p1-1,1)*0.5;
+	}
+}
+// endsub
+
+// sub tom compute the mass matrix componenets and store in initiated geoel array for DGP(1)
+void grid::pre_proc::set_massMat(grid::mesh &mesh1)
+{
+	assert(mesh1.func_count == 6);
+  	mesh1.func_count = 7;     // make sure geoel is inited
+	for (int i = 0; i < mesh1.nelem; i++)//loop over all elements
+	{
+		// get cell data from current mesh object
+		int &p1 = mesh1.inpoel(i, 0);
+		int &p2 = mesh1.inpoel(i, 1);
+		int &p3 = mesh1.inpoel(i, 2);
+		double &x1 = mesh1.coords(p1 - 1, 0);
+		double &x2 = mesh1.coords(p2 - 1, 0);
+		double &x3 = mesh1.coords(p3 - 1, 0);
+		double &y1 = mesh1.coords(p1 - 1, 1);
+		double &y2 = mesh1.coords(p2 - 1, 1);
+		double &y3 = mesh1.coords(p3 - 1, 1);
+		// get centroids of the triangle
+		double &xc = mesh1.geoel(i,1);
+		double &yc = mesh1.geoel(i,2);
+		// get delta_x and delta_y
+		double &delta_x = mesh1.geoel(i,3);
+		double &delta_y = mesh1.geoel(i,4);
+		// get area of the triangle
+		double &A = mesh1.geoel(i,0);
+		mesh1.geoel(i,11) = 	2*A/(delta_x*delta_y)*(x1*x1/12 + x1*x2/12 + x1*x3/12 - x1*xc/3 + x2*x2/12 + x2*x3/12 - x2*xc/3 + x3*x3/12 - x3*xc/3 + xc*xc/2);
+		mesh1.geoel(i,12) =  2*A/(delta_x*delta_y)*(x1*y1/12 + x1*y2/24 + x2*y1/24 + x1*y3/24 + x2*y2/12 + x3*y1/24 + x2*y3/24 + x3*y2/24 + x3*y3/12 - x1*yc/6- xc*y1/6 - x2*yc/6 - xc*y2/6 - x3*yc/6 - xc*y3/6 + xc*yc/2);
+		mesh1.geoel(i,13) =  2*A/(delta_y*delta_y)*(y1*y1/12 + y1*y2/12 + y1*y3/12 - y1*yc/3 + y2*y2/12 + y2*y3/12 - y2*yc/3 + y3*y3/12 - y3*yc/3 + yc*yc/2);
+	}
+}
+// endsub
+
 // sub to generate internal face data needed for DG formulation
 void grid::pre_proc::set_int_geoface(mesh &mesh1)
 {
 
-	// format for geoface data structure (nx ny G1x G1y G2x G2y len of face)
-	// nx ny are the components of the normal vector
-	// TODO add fucntionality to find out the size of the geoface vector depending on ngauss
-	// 2 components of the normal vector 2*ngauss for the gauss poitns and 1 for length of the face
-
-	// generate geoface data structure using intface, intpoel, coords
-	// mesh1.geoface.resize(mesh1.nmaxface,mesh1.ngauss_boun*2+3);
 	mesh1.int_geoface.init(mesh1.nintface, 7);
 	for (int i = 0; i < mesh1.nintface; i++)
 	{
-		double nx, ny;				   // components of the outward area normal vector
-		int ip1 = mesh1.intface(i, 0); // 1st point on the face
-		int ip2 = mesh1.intface(i, 1); // second point on the face
-		double p1x = mesh1.coords(ip1 - 1, 0);
-		double p2x = mesh1.coords(ip2 - 1, 0);
-		double p1y = mesh1.coords(ip1 - 1, 1);
-		double p2y = mesh1.coords(ip2 - 1, 1);
-		nx = p2y - p1y;
-		ny = -1 * (p2x - p1x);
+		int &ip1 = mesh1.intface(i, 0); // 1st point on the face
+		int &ip2 = mesh1.intface(i, 1); // second point on the face
+		double &p1x = mesh1.coords(ip1 - 1, 0);
+		double &p2x = mesh1.coords(ip2 - 1, 0);
+		double &p1y = mesh1.coords(ip1 - 1, 1);
+		double &p2y = mesh1.coords(ip2 - 1, 1);
 		// push the components of Area weighted normal vectors to the geoface matrix
-		mesh1.int_geoface(i, 0) = nx;
-		mesh1.int_geoface(i, 1) = ny;
-
-		// compute the coords of teh gauss points
+		mesh1.int_geoface(i, 0) = p2y - p1y;
+		mesh1.int_geoface(i, 1) = -1*(p2x-p1x);
+		// compute the coords of the gauss points
 		double E1 = -1 / sqrt(3);
 		double E2 = 1 / sqrt(3);
 		double gx1 = 0.5 * (1 - E1) * p1x + 0.5 * (1 + E1) * p2x;
@@ -334,115 +390,32 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 // sub to compute face data for boundary faces needed for rhsboun
 void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
 {
+  mesh1.boun_geoface.init(mesh1.nbface,7);
+  for(int i=0;i<mesh1.nbface;i++) //loop through all the boundary faces
+  {
+    int &p1 = mesh1.bface(i,0);
+    int &p2 = mesh1.bface(i,1);
+    double &p1x = mesh1.coords(p1-1,0);
+    double &p1y = mesh1.coords(p1-1,1);
+    double &p2x = mesh1.coords(p2-1,0);
+    double &p2y = mesh1.coords(p2-1,1);
+		double E1 = -1 / sqrt(3);
+		double E2 = 1 / sqrt(3);
+		double gx1 = 0.5 * (1 - E1) * p1x + 0.5 * (1 + E1) * p2x;
+		double gx2 = 0.5 * (1 - E2) * p1x + 0.5 * (1 + E2) * p2x;
+		double gy1 = 0.5 * (1 - E1) * p1y + 0.5 * (1 + E1) * p2y;
+		double gy2 = 0.5 * (1 - E2) * p1y + 0.5 * (1 + E2) * p2y;
+		mesh1.boun_geoface(i, 2) = gx1;
+		mesh1.boun_geoface(i, 3) = gy1;
+		mesh1.boun_geoface(i, 4) = gx2;
+		mesh1.boun_geoface(i, 5) = gy2;
+		mesh1.boun_geoface(i, 6) = grid::pre_proc::len(p1x, p2x, p1y, p2y);
+  }
 }
 // endsub
 
-// sub to compute element data like shape functions etc
-//                  0      1  2   3    4     5
-// geoel ith row (jacobian xc| yc | m1 | m2 | m3|  g1x | g1y | g2x | g2y | g3x | g3y |)
-//
-void grid::pre_proc::set_geoel(mesh &mesh1)
-{
-	mesh1.geoel.init(mesh1.nelem, 12);
-	for (int i = 0; i < mesh1.nelem; i++)
-	{
-		int &p1 = mesh1.inpoel(i, 0);
-		int &p2 = mesh1.inpoel(i, 1);
-		int &p3 = mesh1.inpoel(i, 2);
-		double &x1 = mesh1.coords(p1 - 1, 0);
-		double &y1 = mesh1.coords(p1 - 1, 1);
-		double &x2 = mesh1.coords(p2 - 1, 0);
-		double &y2 = mesh1.coords(p2 - 1, 1);
-		double &x3 = mesh1.coords(p3 - 1, 0);
-		double &y3 = mesh1.coords(p3 - 1, 1);
-		mesh1.geoel(i, 0) = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3);
-		mesh1.geoel(i, 1) = (x1 + x2 + x3) / 3;
-		mesh1.geoel(i, 2) = (y1 + y2 + y3) / 3;
 
-		// compute the coords of gauss poitns for each element and push the coords to geoel
-	}
-}
-// endsub
 
-// sub tom compute the mass matrix componenets and store in initiated geoel array
-void grid::pre_proc::set_massMat(grid::mesh &mesh1)
-{
-	assert(mesh1.geoel.rows() > 1); // make sure geoel is inited
-	// loop over all elements
-	for (int i = 0; i < mesh1.nelem; i++)
-	{
-		// get cell data from current mesh object
-		int &p1 = mesh1.inpoel(i, 0);
-		int &p2 = mesh1.inpoel(i, 1);
-		int &p3 = mesh1.inpoel(i, 2);
-		double &x1 = mesh1.coords(p1 - 1, 0);
-		double &x2 = mesh1.coords(p2 - 1, 0);
-		double &x3 = mesh1.coords(p3 - 1, 0);
-		double &y1 = mesh1.coords(p1 - 1, 1);
-		double &y2 = mesh1.coords(p2 - 1, 1);
-		double &y3 = mesh1.coords(p3 - 1, 1);
-		// get centroids of the triangle
-		double xc = (x1 + x2 + x3) / 3;
-		double yc = (y1 + y2 + y3) / 3;
-		// get delta_x and delta_y
-		double delta_x = std::max({x1, x2, x3}) / 2 - std::min({x1, x2, x3}) / 2;
-		double delta_y = std::max({y1, y2, y3}) / 2 - std::min({y1, y2, y3}) / 2;
-		// get area of the triangle
-		double A = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3);
-		// loop to calculate the upper diagonal of the mass matrix 3 for P1
-		// vectors needed to simplify the large mathematical equation
-		std::vector<double> X = {x1, x2, x3};
-		std::vector<double> Y = {y1, y2, y3};
-		std::vector<double> Xc = {xc, xc, xc};
-		std::vector<double> Yc = {yc, yc, yc};
-		std::vector<double> Y1 = {y2, y1, y1};
-		std::vector<double> Y2 = {y3, y3, y2};
-		std::vector<double> Y31 = {y2, y3, y1};
-		std::vector<double> X11 = {x2, x3, x1};
-		for (int j = 0; j < 3; j++)
-		{
-			switch (j)
-			{
-			// B2B2
-			case 0:
-			{
-				// compute m1 and push to location in geoel
-
-				double term11 = 0.0833 * (std::inner_product(X.begin(), X.end(), X.begin(), 0.0) + std::inner_product(X.begin(), X.end(), X11.begin(), 0.0));
-				double term12 = 0.3333 * (std::inner_product(X.begin(), X.end(), Xc.begin(), 0.0));
-				double m1 = term11 - term12 + 0.5 * xc * xc;
-				mesh1.geoel(i, 3) = 2 * A * m1 / (delta_x * delta_x);
-				break;
-			}
-
-			// B2B3
-			case 1:
-			{
-				// compute m2 and push to location in geoel
-
-				double term21 = 0.0833 * std::inner_product(X.begin(), X.end(), Y.begin(), 0.0);
-				double term22 = 0.0417 * std::inner_product(X.begin(), X.end(), Y1.begin(), 0.0) + 0.0417 * std::inner_product(X.begin(), X.end(), Y2.begin(), 0.0);
-				double term23 = -0.1667 * (std::inner_product(Xc.begin(), Xc.end(), Y.begin(), 0.0) + std::inner_product(Y.begin(), Y.end(), Xc.begin(), 0.0));
-				double m2 = term21 + term22 + term23 + 0.5 * xc * yc;
-				mesh1.geoel(i, 4) = 2 * A * m2 / (delta_x * delta_y);
-				break;
-			}
-
-			// B3B3
-			case 2:
-			{
-				// compute m3  and push to locaiton in geoel
-				double term31 = 0.0833 * (std::inner_product(Y.begin(), Y.end(), Y.begin(), 0.0) + std::inner_product(Y.begin(), Y.end(), Y31.begin(), 0.0));
-				double term32 = -0.3333 * (std::inner_product(Y.begin(), Y.end(), Yc.begin(), 0.0));
-				double m3 = term31 + term32 + 0.5 * yc * yc;
-				mesh1.geoel(i, 5) = 2 * A * m3 / (delta_y * delta_y);
-				break;
-			}
-			}
-		}
-	}
-}
-// endsub
 
 // sub to  to write out mesh in .vtk format for paraview to read and visualize
 void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
@@ -471,11 +444,9 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 }
 // endsub
 
-// works for 2d only for now
 // method to computes the pressure given values of properties
 double EOS::perf_gas(matrix2d &cons_var)
 {
-
 	double pressure;
 	pressure = (const_properties::gamma - 1) * cons_var(0, 0) * (cons_var(0, 0) - 0.5 / cons_var(0, 0) * (cons_var(1, 0) * cons_var(1, 0) + cons_var(2, 0) * cons_var(2, 0)));
 	return pressure;
@@ -491,4 +462,20 @@ double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y
 double grid::pre_proc::len(double &x1, double &x2, double &y1, double &y2)
 {
 	return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+} 
+
+
+//assemble the mesh
+void grid::construct(grid::mesh &mesh1)
+{
+  grid::pre_proc::set_esup(mesh1); 
+  grid::pre_proc::set_esuel(mesh1);
+  grid::pre_proc::set_bface(mesh1);
+  grid::pre_proc::set_intface(mesh1);
+  grid::pre_proc::set_geoel(mesh1);
+  grid::pre_proc::set_massMat(mesh1);
+  grid::pre_proc::set_int_geoface(mesh1);
+  grid::pre_proc::set_boun_geoface(mesh1);
 }
+
+

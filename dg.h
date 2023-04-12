@@ -4,6 +4,7 @@
 
 namespace DG
 {
+
 	matrix2d Fx(matrix2d &state);// get x direction flux from conservative variables  (standard flux nothing fancy)
 	matrix2d Fy(matrix2d &state);
 	matrix2d U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i); // get solution at point  given the point co-ordinates
@@ -35,13 +36,16 @@ namespace FDS
 		matrix2d lamda;	   // st  ore in the eigen vals
 		matrix2d W_amp;// store in the wave amplitude
 		matrix2d avg_flux; // central averaged flux in cell normal direction
+	public:
+		matrix2d intface_flux;
+	private:	
 		void set_lamda();  // compute and store in eign values of the problem
 		void set_W_amp();  // compute and store in wave strength
 		void set_diss_flux();
-
 	public:
 		RoeFlux();
-		void compute_flux(matrix2d &Ul, matrix2d &Ur, double &nx, double &ny); // constructor computes the averaged vars, stores in nx and ny
+		void compute_req(matrix2d &Ul, matrix2d &Ur, double &nx, double &ny); // constructor computes the averaged vars, stores in nx and ny
+		void compute_flux();
 		matrix2d flux_intface();
 	};
 }

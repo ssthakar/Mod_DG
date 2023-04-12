@@ -69,7 +69,8 @@ namespace grid
 			int nmaxface; //total number of faces in the mesh including internal and boundary
 			int nintface; // number of internal faces
 			int func_count; // function counter to count which function has been executed
-			
+			double domweight;
+      double bounweight;
 			//control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
 
@@ -119,6 +120,7 @@ namespace grid
 		double el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3); // calculate element jacobian 
 		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face
 	}
+  void construct(grid::mesh &mesh1);
 	// subroutines and methdos for post processing
 	namespace post_proc
 	{
