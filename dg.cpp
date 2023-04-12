@@ -1,6 +1,12 @@
 #include "dg.h"
 #include "mesh.h"
 
+
+double DG::vel_sound(matrix2d &Ul)
+{
+  return sqrt(const_properties::gamma*EOS::perf_gas(Ul)/Ul(0,0)); //return the speed of sound for a given conservative variable vector
+}
+
 matrix2d DG::U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i) // function to get the conservative variable at any point withing an element
 {
   matrix2d state;
@@ -62,19 +68,31 @@ void DG::rhsdomn(grid::mesh &mesh1) // pass reference to the mesh object
 // sub to push the contribution of the boundary integral to rhsel from bface only
 void DG::rhsboun_bface(grid::mesh &mesh1)
 {
+  FDS::RoeFlux fluxobj;
   assert(mesh1.unkel.size() > 1);        // make sure intialization of the flow field is done and the storage container is resized
   for (int i = 0; i < mesh1.nbface; i++) // loop over all boundary faces
   {
-    // get the host cell number
-    for (int j = 0; j < mesh1.ngauss_boun; j++)
+    switch(mesh1.bface(i,4)) //check which kind of boundary condition it is
     {
-      // compute the numerical integral and push to rhsel location
+      //solid wall flag is 2
+      case 2:
+        for(int j=0;j<mesh1.ngauss_boun;j++) //loop over all gauss points of the boundary
+        {
+
+        }
+      
+
+      break;
+      //inlet outlet flag is 4 
+      case 4:
+      break;
     }
   }
 }
+
 // endsub
 
-// TODO implement correct gauss coords rght now using nx and ny which is not correct
+
 //  sub to compute the contribution of the boundary integral at interfaces to RHSel from internal faces
 void DG::rhsboun_iface(grid::mesh &mesh1)
 {

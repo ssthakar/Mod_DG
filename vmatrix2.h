@@ -5,6 +5,10 @@
 #include <fstream>
 #include <cassert>
 #include <vector>
+
+
+
+//TODO implement iterator functionality for more control over access
 template <class T>
 class vmatrix2
 {
@@ -88,7 +92,7 @@ void vmatrix2<T>::init(int nrows, int ncols)
   m_n = nrows * ncols;
   m_vec.resize(m_n, 0.0);
 }
-
+//simple function to print out arrays in .dat format for debugging and plotting
 template <class T>
 void printMatrix(vmatrix2<T> &matrix, std::string s1)
 {

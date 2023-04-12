@@ -85,7 +85,7 @@ namespace grid
 			matrix2d geoface; // data structure to store in boundary face data
 			matrix2d int_geoface; // data structure to store in internal face data
       matrix2d boun_geoface; // data struct to store in face data for boundary faces only
-    
+      matrix2d delta_T; //data structure to store in local timestep for all cells    
 			//store in jacobian, shape function integrals guass point locations 
 			matrix2d domn_weights; // vectors to store in domain weights depending on number of gauss points used 
 			matrix2d line_weights; //vector to store in weights for the boundary integral depending on number of guass points used

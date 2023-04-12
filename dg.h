@@ -4,7 +4,7 @@
 
 namespace DG
 {
-
+  double vel_sound(matrix2d &U); //get the speed of sound given the conservative variables vector 
 	matrix2d Fx(matrix2d &state);// get x direction flux from conservative variables  (standard flux nothing fancy)
 	matrix2d Fy(matrix2d &state);
 	matrix2d U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i); // get solution at point  given the point co-ordinates
@@ -56,6 +56,8 @@ namespace FVS
 	{
 	};
 }
+
+
 
 namespace ddt // time marching methods for local cells
 {

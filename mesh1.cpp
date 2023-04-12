@@ -36,8 +36,8 @@ std::vector<std::vector<double>> reader::readv(std::string s)
 // construtor for mesh class generates intpoel,coords and bface data sructures from mesh file
 grid::mesh::mesh(std::string s1, std::string s2)
 {
-
-	func_count = 1;
+  
+	func_count = 1; //start function counter to maintain order
 	std::vector<std::vector<double>> v = reader::readv(s1);
 	std::vector<std::vector<double>> c = reader::readv(s2);
 	// get all the int members of the class
@@ -80,6 +80,7 @@ grid::mesh::mesh(std::string s1, std::string s2)
 		}
 		bface(i, 4) = v[i + nelem + 2 * npoin + 12][3];
 	}
+  delta_T.init(nelem,1); //init the delta_T contaiiner
 }
 // end constructor
 
@@ -358,7 +359,8 @@ void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 // sub to generate internal face data needed for DG formulation
 void grid::pre_proc::set_int_geoface(mesh &mesh1)
 {
-
+  assert(mesh1.func_count == 7);
+  mesh1.func_count = 8;
 	mesh1.int_geoface.init(mesh1.nintface, 7);
 	for (int i = 0; i < mesh1.nintface; i++)
 	{
@@ -390,6 +392,7 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 // sub to compute face data for boundary faces needed for rhsboun
 void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
 {
+  assert(mesh1.func_count == 8);
   mesh1.boun_geoface.init(mesh1.nbface,7);
   for(int i=0;i<mesh1.nbface;i++) //loop through all the boundary faces
   {
