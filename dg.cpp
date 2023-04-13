@@ -110,9 +110,34 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
       break;
       //inlet outlet flag is 4 
       case 4:
+        for(int j=0;j<mesh1.ngauss_boun;j++)
+        {
+          matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le);
+          matrix2d Ur(4,1);
+          Ur(0,0) = Ul(0,0); //density
+          Ur(3,0) = Ul(3,0);//energy
+          Ur(1,0) = Ul(1,0)/Ul(0,0) - 2*(Ul(1,0)/Ul(0,0)*nx + Ul(2,0)/Ul(0,0)*ny)*nx;
+          Ur(2,0) = Ul(2,0)/Ul(0,0) - 2*(Ul(1,0)/Ul(0,0)*nx + Ul(2,0)/Ul(0,0)*ny)*ny;
+          fluxobj.compute_req(Ul,Ur,nx,ny);
+          fluxobj.compute_flux();
+          matrix2d &flux = fluxobj.intface_flux; //reference to interface flux
+          mesh1.rhsel(le, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,0, 0);
+          mesh1.rhsel(le, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,0,1);
+          mesh1.rhsel(le, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,0,2);
+      
+          mesh1.rhsel(le, 1, 0)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,1, 0);
+          mesh1.rhsel(le, 1, 1)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,1,1);
+          mesh1.rhsel(le, 1, 2)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,1,2);
+      
+          mesh1.rhsel(le, 2, 0)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,2, 0);
+          mesh1.rhsel(le, 2, 1)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,2,1);
+          mesh1.rhsel(le, 2, 2)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,2,2);
+      
+          mesh1.rhsel(le, 3, 0)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,3, 0);
+          mesh1.rhsel(le, 3, 1)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,3,1);
+          mesh1.rhsel(le, 3, 2)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,3,2); 
+        }
       break;
- 
-
     }
   }
 }
@@ -258,9 +283,68 @@ void FDS::RoeFlux::compute_flux()
 // end class definition
 
 // function to calculate local time step for cell i
-double ddt::local_ts(grid::mesh &mesh1, int &i)
+void ddt::local_ts(grid::mesh &mesh1, int &i)
 {
-  double delta_T;
+	for(int i=0;i<mesh1.nintface;i++) 
+	{
 
-  return delta_T;
+	}
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

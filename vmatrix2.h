@@ -1,6 +1,7 @@
 /* A simple template class to store in 2d arrays in flattened format in 1d vectors*/
 #ifndef VMATRIX_H
 #define VMATRIX_H
+#include <initializer_list>
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -15,8 +16,10 @@ class vmatrix2
 public:
   //constructors
   vmatrix2();                                               //++defualt constructor
-  vmatrix2(const int nrows, const int ncols);                           // constrcutor for 2d matrix having nrows and ncols all values inited to zero
-  
+  vmatrix2(const int nrows, const int ncols);// constrcutor for 2d matrix having nrows and ncols all values inited to zero
+  vmatrix2(std::vector<T> input); //list initialization
+
+
   // methods
   void init(int nrows, int ncols);                       // initialize a vector and set all values to 0 using resize
   void printMatrix(vmatrix2<T> &matrix, std::string s1); // method to print matrix to file
@@ -109,4 +112,14 @@ void printMatrix(vmatrix2<T> &matrix, std::string s1)
     file << std::endl;
   }
 }
+
+template<class T>
+vmatrix2<T>::vmatrix2(std::vector<T> input)
+{
+	m_vec.resize(1);
+	m_vec.insert(m_vec.begin(),input.begin(),input.end());
+} 
+
+
+
 #endif

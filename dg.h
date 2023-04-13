@@ -61,7 +61,7 @@ namespace FVS
 
 namespace ddt // time marching methods for local cells
 {
-	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
+	void local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace explct
 	{
 		matrix2d fwd_euler(grid::mesh &mesh1, double &delta);
