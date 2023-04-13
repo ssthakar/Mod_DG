@@ -370,9 +370,9 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 		double &p2x = mesh1.coords(ip2 - 1, 0);
 		double &p1y = mesh1.coords(ip1 - 1, 1);
 		double &p2y = mesh1.coords(ip2 - 1, 1);
-		// push the components of Area weighted normal vectors to the geoface matrix
-		mesh1.int_geoface(i, 0) = p2y - p1y;
-		mesh1.int_geoface(i, 1) = -1*(p2x-p1x);
+		double mag = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
+		mesh1.int_geoface(i, 0) = p2y - p1y/mag; //unit normal vector components x and y 
+		mesh1.int_geoface(i, 1) = -1*(p2x-p1x)/mag;
 		// compute the coords of the gauss points
 		double E1 = -1 / sqrt(3);
 		double E2 = 1 / sqrt(3);
@@ -402,6 +402,9 @@ void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
     double &p1y = mesh1.coords(p1-1,1);
     double &p2x = mesh1.coords(p2-1,0);
     double &p2y = mesh1.coords(p2-1,1);
+    double mag = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));   
+    mesh1.boun_geoface(i,0) = p2y - p1y/mag; //unit normal vectors components x and yu
+    mesh1.boun_geoface(i,1) = p1x - p2x/mag;
 		double E1 = -1 / sqrt(3);
 		double E2 = 1 / sqrt(3);
 		double gx1 = 0.5 * (1 - E1) * p1x + 0.5 * (1 + E1) * p2x;
