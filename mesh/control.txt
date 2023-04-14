@@ -1,0 +1,5 @@
+1.0 //degree of the polynomial function
+2.0 //boundary gauss points
+3.0 //domain guass points
+0.33333333333 //domain weight
+1.0 //boun weight

@@ -89,8 +89,7 @@ void grid::pre_proc::set_esup(grid::mesh &mesh1)
 {
 	assert(mesh1.func_count == 1); // function must run after mesh constructor
 	mesh1.func_count = 2;		   // update func_counter
-	// mesh1.esup2.resize(mesh1.npoin + 1, 1); // init matrix to store in index
-	mesh1.esup2.init(mesh1.npoin + 1, 1); // initialize instance
+	mesh1.esup2.init(mesh1.npoin + 1, 1); // initialize 
 	// this pass counts number of elements surrounding every point and stores that number in +1 index corresponding to that particular point
 	// for eg if point 9 has 6 elements around it, then
 	//  the number stored in index 10(for c++ it will be index 9) will be the number 6 after the first element pass
@@ -297,7 +296,7 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 {
   assert(mesh1.func_count == 5);
   mesh1.func_count = 6;
-	mesh1.geoel.init(mesh1.nelem, 14);
+	mesh1.geoel.init(mesh1.nelem, 15);
 	for (int i = 0; i < mesh1.nelem; i++)
 	{
 		int &p1 = mesh1.inpoel(i, 0);
@@ -309,7 +308,7 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 		double &y2 = mesh1.coords(p2 - 1, 1);
 		double &x3 = mesh1.coords(p3 - 1, 0);
 		double &y3 = mesh1.coords(p3 - 1, 1);
-		mesh1.geoel(i, 0) = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3);
+		mesh1.geoel(i, 0) = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3)(0,0);
 		mesh1.geoel(i, 1) = (x1 + x2 + x3) / 3; //xc  
 		mesh1.geoel(i, 2) = (y1 + y2 + y3) / 3; //yc
 		mesh1.geoel(i,3) = std::max({x1,x2,x3}) - std::min({x1,x2,x3}); // delta_x
@@ -320,6 +319,7 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 		mesh1.geoel(i,8) = mesh1.coords(p2-1,1)*0.5 + mesh1.coords(p3-1,1)*0.5;
 		mesh1.geoel(i,9) = mesh1.coords(p3-1,0)*0.5 + mesh1.coords(p1-1,0)*0.5;
 		mesh1.geoel(i,10) = mesh1.coords(p3-1,1)*0.5 + mesh1.coords(p1-1,1)*0.5;
+    mesh1.geoel(i,14) = grid::pre_proc::el_jacobian(x1,x2,x3,y1,y2,y3)(1,0);
 	}
 }
 // endsub
@@ -371,7 +371,7 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 		double &p1y = mesh1.coords(ip1 - 1, 1);
 		double &p2y = mesh1.coords(ip2 - 1, 1);
 		double mag = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
-		mesh1.int_geoface(i, 0) = p2y - p1y/mag; //unit normal vector components x and y 
+		mesh1.int_geoface(i, 0) = (p2y - p1y)/mag; //unit normal vector components x and y 
 		mesh1.int_geoface(i, 1) = -1*(p2x-p1x)/mag;
 		// compute the coords of the gauss points
 		double E1 = -1 / sqrt(3);
@@ -384,7 +384,7 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 		mesh1.int_geoface(i, 3) = gy1;
 		mesh1.int_geoface(i, 4) = gx2;
 		mesh1.int_geoface(i, 5) = gy2;
-		mesh1.int_geoface(i, 6) = grid::pre_proc::len(p1x, p2x, p1y, p2y);
+		mesh1.int_geoface(i, 6) = len(p1x, p2x, p1y, p2y);
 	}
 }
 // endsub
@@ -415,7 +415,7 @@ void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
 		mesh1.boun_geoface(i, 3) = gy1;
 		mesh1.boun_geoface(i, 4) = gx2;
 		mesh1.boun_geoface(i, 5) = gy2;
-		mesh1.boun_geoface(i, 6) = grid::pre_proc::len(p1x, p2x, p1y, p2y);
+		mesh1.boun_geoface(i, 6) = len(p1x, p2x, p1y, p2y);
   }
 }
 // endsub
@@ -459,13 +459,18 @@ double EOS::perf_gas(matrix2d &cons_var)
 }
 
 // this method computes the jacobian for a triangular element
-double grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
+matrix2d grid::pre_proc::el_jacobian(double &x1, double &x2, double &x3, double &y1, double &y2, double &y3)
 {
-	return 0.5 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+  matrix2d el(2,1);
+	el(0,0) = 0.5 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+  double x0 = 1*((x1*x1 + y1*y1)*(y2-y3)-(x2*x2 + y2*y2)*(y1-y3) + (x3*x3 + y3*y3)*(y1-y2))/(4*el(0,0));
+  double y0 = -1*((x1*x1 + y1*y1)*(x2-x3)-(x2*x2 + y2*y2)*(x1-x3) + (x3*x3 + y3*y3)*(x1-x2))/(4*el(0,0));
+  el(1,0) = len(x2,x0,y2,y0); 
+  return el;
 }
 
 // this method computes the length of the 2d face
-double grid::pre_proc::len(double &x1, double &x2, double &y1, double &y2)
+double len(double &x1, double &x2, double &y1, double &y2)
 {
 	return sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 } 

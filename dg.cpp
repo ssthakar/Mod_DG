@@ -1,5 +1,8 @@
 #include "dg.h"
 #include "mesh.h"
+#include <cmath>
+
+
 
 
 double DG::vel_sound(matrix2d &Ul)
@@ -64,7 +67,7 @@ void DG::rhsdomn(grid::mesh &mesh1) // pass reference to the mesh object
     }
   }
 }
-
+//ensdub
 // sub to push the contribution of the boundary integral to rhsel from bface only
 void DG::rhsboun_bface(grid::mesh &mesh1)
 {
@@ -145,7 +148,7 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
 // endsub
 
 
-//  sub to compute the contribution of the boundary integral at interfaces to RHSel from internal faces
+//  sub to compute the contribution of the boundary integral at interfaces to RHSel from internal faces and compute local timestep for the next iteration
 void DG::rhsboun_iface(grid::mesh &mesh1)
 {
   FDS::RoeFlux fluxobj;                    // instantiante flux object outside loop, to reduce the overhead of instantiating an object every time
@@ -162,8 +165,14 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
       matrix2d Ur = DG::U_at_poin(mesh1, mesh1.int_geoface(i, 2*j + 2), mesh1.int_geoface(i, 2*j + 3), re);
       fluxobj.compute_req(Ul, Ur, nx, ny);   // compute the pre requiremente flux object using required data
       fluxobj.compute_flux();                // get the flux  at the interface from approximate reimann solver
+    
+      //calculate and push the local timestep to appropriate location
+      mesh1.delta_T(le,0) = mesh1.geoel(le,14)/std::max({fluxobj.lamda(0,0),fluxobj.lamda(1,0),fluxobj.lamda(2,0),fluxobj.lamda(3,0)})*const_properties::CFL;
+      mesh1.delta_T(re,0) = mesh1.geoel(re,14)/std::max({fluxobj.lamda(0,0),fluxobj.lamda(1,0),fluxobj.lamda(2,0),fluxobj.lamda(3,0)})*const_properties::CFL;
+
+
       // left hand side pushes
-      matrix2d &flux = fluxobj.intface_flux; // refrence to flux vector obtained from Roes reimann flux solver
+      matrix2d &flux = fluxobj.intface_flux;// refrence to flux vector obtained from Roes reimann flux solver
       mesh1.rhsel(le, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,0, 0);
       mesh1.rhsel(le, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,0,1);
       mesh1.rhsel(le, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,0,2);
@@ -195,8 +204,6 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
       mesh1.rhsel(re, 3, 0)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(re,3, 0);
       mesh1.rhsel(re, 3, 1)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re,1))/mesh1.geoel(re,3) + mesh1.rhsel(re,3,1);
       mesh1.rhsel(re, 3, 2)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re,2))/mesh1.geoel(re,4) + mesh1.rhsel(re,3,2);
-    
-
     }
   }
 }
@@ -283,68 +290,65 @@ void FDS::RoeFlux::compute_flux()
 // end class definition
 
 // function to calculate local time step for cell i
-void ddt::local_ts(grid::mesh &mesh1, int &i)
+double ddt::local_ts(grid::mesh &mesh1, int &i)
 {
-	for(int i=0;i<mesh1.nintface;i++) 
+	double denom = 0.0; //declare the place holder that will store in the boundary sum
+	double &area = mesh1.geoel(i,0); //area of the triangular element
+	int &ip1 = mesh1.inpoel(i, 0); // get the points that make up the cell 
+	int &ip2 = mesh1.inpoel(i, 1);
+	int &ip3 = mesh1.inpoel(i,2);
+	double &p1x = mesh1.coords(ip1 - 1, 0);
+	double &p2x = mesh1.coords(ip2 - 1, 0);
+	double &p3x = mesh1.coords(ip3 - 1, 0);
+	double &p1y = mesh1.coords(ip1 - 1, 1);
+	double &p2y = mesh1.coords(ip2 - 1, 1);
+	double &p3y = mesh1.coords(ip3 - 1, 1);
+	double mag1 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
+	double mag2 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
+	double mag3 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
+	double nx1 = (p2y - p1y)/mag1; //unit normal vector components x and y 
+	double ny1 = -1*(p2x-p1x)/mag1;
+	double nx2 = (p3y - p2y)/mag2; //unit normal vector components x and y 
+	double ny2 = -1*(p3x-p2x)/mag2;
+	double nx3 = (p1y - p3y)/mag3; //unit normal vector components x and y 
+	double ny3 = -1*(p1x-p3x)/mag3;
+	double len1 = len(p1x,p2x,p1y,p2y);
+	double len2 = len(p2x,p3x,p2y,p3y);
+	double len3 = len(p1x,p3x,p1y,p3y);
+
+	for(int j=0;j<mesh1.ntype;j++)  //loop over all the edges of the cell 
 	{
-
+		switch(j)
+		{
+			case 0:
+			{// side with p1 and p2 as end points
+				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
+				matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j));
+				double ci = DG::vel_sound(Ui);
+				double cj = DG::vel_sound(Uj);
+				denom = denom + len1*0.5*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx1 + Uj(1,0)/Uj(0,0)*nx1 + Ui(2,0)/Ui(0,0)*ny1 + Uj(2,0)/Uj(0,0)*ny1));
+				break;
+			}
+			case 1:
+			{
+				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
+				matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j));
+				double ci = DG::vel_sound(Ui);
+				double cj = DG::vel_sound(Uj);
+				denom = denom + len2*0.5*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx2 + Uj(1,0)/Uj(0,0)*nx2 + Ui(2,0)/Ui(0,0)*ny2 + Uj(2,0)/Uj(0,0)*ny2));
+				break;
+			}
+			case 2:
+			{
+				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
+				matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j));
+				double ci = DG::vel_sound(Ui);
+				double cj = DG::vel_sound(Uj);
+				denom = denom + 0.5*len3*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx3 + Uj(1,0)/Uj(0,0)*nx3 + Ui(2,0)/Ui(0,0)*ny3 + Uj(2,0)/Uj(0,0)*ny3));
+				break;
+			}
+		}
 	}
-
+	return area/denom;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -4,6 +4,8 @@
 
 namespace DG
 {
+	double det(matrix2d &coords); //function to get dererminant of from any three points;
+	double circum_rad(matrix2d &coords); //function to get the radius of the circum-circle of a triangle
   double vel_sound(matrix2d &U); //get the speed of sound given the conservative variables vector 
 	matrix2d Fx(matrix2d &state);// get x direction flux from conservative variables  (standard flux nothing fancy)
 	matrix2d Fy(matrix2d &state);
@@ -33,10 +35,11 @@ namespace FDS
 		matrix2d dissFlux; // disspative flux substracted from the CD
 		matrix2d avg;	   // store in Roes averaged vars, computed with object instantiation through the constructor
 										 // computes the central averaged flux in the normal direction
-		matrix2d lamda;	   // st  ore in the eigen vals
+		//matrix2d lamda;	   // st  ore in the eigen vals
 		matrix2d W_amp;// store in the wave amplitude
 		matrix2d avg_flux; // central averaged flux in cell normal direction
 	public:
+		matrix2d lamda;
 		matrix2d intface_flux;
 	private:	
 		void set_lamda();  // compute and store in eign values of the problem
@@ -61,7 +64,7 @@ namespace FVS
 
 namespace ddt // time marching methods for local cells
 {
-	void local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
+	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace explct
 	{
 		matrix2d fwd_euler(grid::mesh &mesh1, double &delta);

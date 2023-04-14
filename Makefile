@@ -11,4 +11,4 @@ dg.o: mesh1.cpp mesh.h mMatrix3.h mMatrix.h dg.h
 	g++ -c dg.cpp
 
 clean:
-	rm *.o *.dat a.out
+	rm *.o  a.out

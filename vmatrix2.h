@@ -7,8 +7,6 @@
 #include <cassert>
 #include <vector>
 
-
-
 //TODO implement iterator functionality for more control over access
 template <class T>
 class vmatrix2
@@ -17,9 +15,7 @@ public:
   //constructors
   vmatrix2();                                               //++defualt constructor
   vmatrix2(const int nrows, const int ncols);// constrcutor for 2d matrix having nrows and ncols all values inited to zero
-  vmatrix2(std::vector<T> input); //list initialization
-
-
+  vmatrix2(std::initializer_list<T> input); //list initialization
   // methods
   void init(int nrows, int ncols);                       // initialize a vector and set all values to 0 using resize
   void printMatrix(vmatrix2<T> &matrix, std::string s1); // method to print matrix to file
@@ -43,7 +39,7 @@ vmatrix2<T>::vmatrix2()
   std::vector<T> m_vec(1);
 }
 
-// static init
+// static initialization using constructor
 template <class T>
 vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
 {
@@ -53,14 +49,25 @@ vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
   m_vec.resize(m_n, 0.0);
 }
 
-// function to get index for 1d vector from 2d matrix rows and cols
+//list initializer constructor to construct a matrix
+template<class T>
+vmatrix2<T>::vmatrix2(std::initializer_list<T> input)
+{
+	m_rows = input.size();
+	m_cols = 1;
+	m_n = m_rows;
+	m_vec.insert(m_vec.begin(),input.begin(),input.end());
+}
+
+
+// function to get striding index for 1d vector from 2d matrix rows and cols
 template <class T>
 int vmatrix2<T>::index(int row, int col)
 {
   return row * m_cols + col;
 }
 
-// need this because m_vec is private;
+// need this because m_vec is private, size of the 2d Matrix;
 template <class T>
 int vmatrix2<T>::size()
 {
@@ -73,12 +80,14 @@ int vmatrix2<T>::cols()
 {
   return m_cols;
 }
+
 template <class T>
 int vmatrix2<T>::rows()
 {
   return m_rows;
 }
 
+//operator overload for () for assignment and access of the data
 template <class T>
 T &vmatrix2<T>::operator()(int row, int col)
 {
@@ -86,6 +95,7 @@ T &vmatrix2<T>::operator()(int row, int col)
   int lindex = index(row, col);
   return m_vec[lindex];
 }
+
 //dynamic initialization
 template <class T>
 void vmatrix2<T>::init(int nrows, int ncols)
@@ -95,6 +105,7 @@ void vmatrix2<T>::init(int nrows, int ncols)
   m_n = nrows * ncols;
   m_vec.resize(m_n, 0.0);
 }
+
 //simple function to print out arrays in .dat format for debugging and plotting
 template <class T>
 void printMatrix(vmatrix2<T> &matrix, std::string s1)
@@ -112,14 +123,5 @@ void printMatrix(vmatrix2<T> &matrix, std::string s1)
     file << std::endl;
   }
 }
-
-template<class T>
-vmatrix2<T>::vmatrix2(std::vector<T> input)
-{
-	m_vec.resize(1);
-	m_vec.insert(m_vec.begin(),input.begin(),input.end());
-} 
-
-
-
+ 
 #endif

@@ -117,9 +117,8 @@ namespace grid
 		void set_int_geoface(grid::mesh &mesh1); //generates face data for all internal faces 
 		void set_geoel(grid::mesh &mesh1); //generates element data
 		void set_massMat(grid::mesh &mesh1); 
-		double el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3); // calculate element jacobian 
-		double len(double &x1, double &x2, double &y1, double &y2); // calculate the length of a face
-	}
+		matrix2d el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3);// calculate element jacobian 
+  }
   void construct(grid::mesh &mesh1);
 	// subroutines and methdos for post processing
 	namespace post_proc
@@ -128,6 +127,8 @@ namespace grid
 	}
 }
 //end of grid namespace 
+
+double len(double &x1,double &x2, double &y1, double &y2);
 
 #endif 
 
