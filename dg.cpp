@@ -86,14 +86,17 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
         for(int j=0;j<mesh1.ngauss_boun;j++) //loop over all gauss points of the boundary
         {
           matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le);
-          matrix2d Ur(4,1);
+          matrix2d Ur(4,1); //init the right storage, this belongs to a ghost cell
           Ur(0,0) = Ul(0,0); //density
           Ur(3,0) = Ul(3,0);//energy
-          Ur(1,0) = Ul(1,0)/Ul(0,0) - 2*(Ul(1,0)/Ul(0,0)*nx + Ul(2,0)/Ul(0,0)*ny)*nx;
+          // compute velocity using mirror images
+					Ur(1,0) = Ul(1,0)/Ul(0,0) - 2*(Ul(1,0)/Ul(0,0)*nx + Ul(2,0)/Ul(0,0)*ny)*nx;
           Ur(2,0) = Ul(2,0)/Ul(0,0) - 2*(Ul(1,0)/Ul(0,0)*nx + Ul(2,0)/Ul(0,0)*ny)*ny;
           fluxobj.compute_req(Ul,Ur,nx,ny);
           fluxobj.compute_flux();
           matrix2d &flux = fluxobj.intface_flux; //reference to interface flux
+																								 
+					//pushes to the left element only as the right element is a ghost cell 
           mesh1.rhsel(le, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,0, 0);
           mesh1.rhsel(le, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,0,1);
           mesh1.rhsel(le, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,0,2);
@@ -124,6 +127,8 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
           fluxobj.compute_req(Ul,Ur,nx,ny);
           fluxobj.compute_flux();
           matrix2d &flux = fluxobj.intface_flux; //reference to interface flux
+
+					//pushes to the left element only as the right element is a ghost cell 
           mesh1.rhsel(le, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,0, 0);
           mesh1.rhsel(le, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,0,1);
           mesh1.rhsel(le, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,0,2);
@@ -168,7 +173,7 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
     
 
 
-      // left hand side pushes
+      // left hand side pushes, flux contribution added due to normal vector and flux vector being in the same direction
       matrix2d &flux = fluxobj.intface_flux;// refrence to flux vector obtained from Roes reimann flux solver
       mesh1.rhsel(le, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,0, 0);
       mesh1.rhsel(le, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,0,1);
@@ -185,7 +190,8 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
       mesh1.rhsel(le, 3, 0)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(le,3, 0);
       mesh1.rhsel(le, 3, 1)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le,1))/mesh1.geoel(le,3) + mesh1.rhsel(le,3,1);
       mesh1.rhsel(le, 3, 2)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le,2))/mesh1.geoel(le,4) + mesh1.rhsel(le,3,2);
-      //right hand side pushes
+      
+			//right hand side pushes flux contribution substracted due to the opposing direction of the outward normal
       mesh1.rhsel(re, 0, 0)  = -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2 + mesh1.rhsel(re,0, 0);
       mesh1.rhsel(re, 0, 1)  = -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re,1))/mesh1.geoel(re,3) + mesh1.rhsel(re,0,1);
       mesh1.rhsel(re, 0, 2)  = -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,0)/2*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re,2))/mesh1.geoel(re,4) + mesh1.rhsel(re,0,2);
