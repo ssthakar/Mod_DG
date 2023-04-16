@@ -1,6 +1,14 @@
 #ifndef DG_H
 #define DG_H
 #include "mesh.h"
+#include <stdexcept>
+
+class soln//instantiate at the beginning of the simulation 
+{
+	public:
+	double abstol;
+	int max_iter;
+};
 
 namespace DG
 {
@@ -34,8 +42,6 @@ namespace FDS
 		double deltaVn;
 		matrix2d dissFlux; // disspative flux substracted from the CD
 		matrix2d avg;	   // store in Roes averaged vars, computed with object instantiation through the constructor
-										 // computes the central averaged flux in the normal direction
-		//matrix2d lamda;	   // st  ore in the eigen vals
 		matrix2d W_amp;// store in the wave amplitude
 		matrix2d avg_flux; // central averaged flux in cell normal direction
 	public:
@@ -52,23 +58,17 @@ namespace FDS
 		matrix2d flux_intface();
 	};
 }
-namespace FVS
-{
-	// Van Leers quadtratic function vector split
-	class VanLeer
-	{
-	};
-}
-
 
 
 namespace ddt // time marching methods for local cells
 {
 	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
-	namespace explct
+	namespace RK3 //TVD Runge Kutta 3 stage 
 	{
-		matrix2d fwd_euler(grid::mesh &mesh1, double &delta);
-		matrix2d RK3(grid::mesh &mesh1, double &delta_t); // TVD runge Kutta 3rd order takes reference to mesh object and timestep
+		void RK3_outer(grid::mesh &mesh1, soln &soln1);// outer function 
+		void RK_s1(grid::mesh &mesh1); //first stage, also forward Euler
+		void RK_s2(grid::mesh &mesh1); //second stage 
+		void RK_s3(grid::mesh &mesh1); //third stage
 	};
 };
 

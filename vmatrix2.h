@@ -16,7 +16,8 @@ public:
   vmatrix2();                                               //++defualt constructor
   vmatrix2(const int nrows, const int ncols);// constrcutor for 2d matrix having nrows and ncols all values inited to zero
   vmatrix2(std::initializer_list<T> input); //list initialization
-  // methods
+  vmatrix2(const vmatrix2<T> &vector); //copy constructor
+	// methods
   void init(int nrows, int ncols);                       // initialize a vector and set all values to 0 using resize
   void printMatrix(vmatrix2<T> &matrix, std::string s1); // method to print matrix to file
   int rows();
@@ -47,6 +48,12 @@ vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
   m_cols = ncols;
   m_n = m_rows * m_cols;
   m_vec.resize(m_n, 0.0);
+}
+
+template<class T>
+vmatrix2<T>::vmatrix2(const vmatrix2<T> &vector)
+{
+	m_vec = vector.m_vec;
 }
 
 //list initializer constructor to construct a matrix

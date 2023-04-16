@@ -80,7 +80,6 @@ grid::mesh::mesh(std::string s1, std::string s2)
 		}
 		bface(i, 4) = v[i + nelem + 2 * npoin + 12][3];
 	}
-  delta_T.init(nelem,1); //init the delta_T contaiiner
 }
 // end constructor
 
@@ -319,7 +318,6 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 		mesh1.geoel(i,8) = mesh1.coords(p2-1,1)*0.5 + mesh1.coords(p3-1,1)*0.5;
 		mesh1.geoel(i,9) = mesh1.coords(p3-1,0)*0.5 + mesh1.coords(p1-1,0)*0.5;
 		mesh1.geoel(i,10) = mesh1.coords(p3-1,1)*0.5 + mesh1.coords(p1-1,1)*0.5;
-    mesh1.geoel(i,14) = grid::pre_proc::el_jacobian(x1,x2,x3,y1,y2,y3)(1,0);
 	}
 }
 // endsub
@@ -488,5 +486,6 @@ void grid::construct(grid::mesh &mesh1)
   grid::pre_proc::set_int_geoface(mesh1);
   grid::pre_proc::set_boun_geoface(mesh1);
 }
+
 
 

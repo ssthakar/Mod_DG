@@ -13,6 +13,7 @@ class mMatrix3
 	public:
 		mMatrix3(); //default
 		mMatrix3(int x,int y,int z); // construct a 3d array of x by y by z dimensions and init to 0
+		mMatrix3(const mMatrix3<T> &matrix); //copy constructor
 		// config/init methods
 		void init(int x,int y,int z);
 		//getter methods 
@@ -24,6 +25,7 @@ class mMatrix3
 
 		// operator overload for () to access elements
 		T &operator()(const int i,const int j,const int k);
+
 	private:
   	std::vector<T> m_vec; //actual array that stores in data 
 		int m_i ,m_j,m_k,m_n; // dimensions of 3d matrix
@@ -49,6 +51,12 @@ mMatrix3<T>::mMatrix3(int x, int y, int z)
 	m_k = z;
 	m_n = m_i*m_j*m_k; 
 	m_vec.resize(m_n,0.0);
+}
+
+template<class T>
+mMatrix3<T>::mMatrix3(const mMatrix3<T> &matrix)
+{
+	m_vec = matrix.m_vec;
 }
 
 

@@ -24,7 +24,6 @@
 // 2d arrays 
 typedef vmatrix2<int> matrix2i;
 typedef vmatrix2<double> matrix2d;
-typedef vmatrix2<float> matrix2f;
 // 3d arrays
 typedef mMatrix3<int> matrix3i;
 typedef mMatrix3<double> matrix3d;
@@ -35,7 +34,9 @@ namespace const_properties
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
 	const double CFL = 0.95; //CFL to use in the local time stepping for pseudo transient integration
+
 }
+
 namespace EOS
 {
 	//equation of state for a monoatomic_gas;
@@ -48,12 +49,9 @@ namespace reader
 };
 
 
-
-//add weights for gauss points
 namespace grid
 {
-  // mesh class object 
-	class mesh  //main object
+	class mesh  //mesh object
 	{
 		public:
 			int nelem; //number of grid cells without periodic boundary conditions
@@ -69,37 +67,33 @@ namespace grid
 			int nmaxface; //total number of faces in the mesh including internal and boundary
 			int nintface; // number of internal faces
 			int func_count; // function counter to count which function has been executed
-			double domweight;
-      double bounweight;
+			double domweight; //weights for domain gauss quadrature
+      double bounweight; //weigths for boundary domain quadrature
 			//control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
 
-			//mesh members
+			//mesh data structures
 			matrix2i inpoel; // connectivity matrix for mesh 
 			matrix2d coords;// coords matrix 
 			matrix2i bface; //matrix to store in boundary face and the flags needed to identify a face as inlet,outlet or wall
-			matrix2i esup1; //elements surrounding points data struct
-			matrix2i esup2; // support data struct for abve
+			matrix2i esup1; //
+			matrix2i esup2; // esup1 and esup2 form a linked list data structure to store in element surrounding points
 			matrix2i esuel; //element surrounding element data structure
 			matrix2i intface; //interface connectivity matrix 
-			matrix2d geoface; // data structure to store in boundary face data
 			matrix2d int_geoface; // data structure to store in internal face data
       matrix2d boun_geoface; // data struct to store in face data for boundary faces only
-      matrix2d delta_T; //data structure to store in local timestep for all cells    
-			//store in jacobian, shape function integrals guass point locations 
-			matrix2d domn_weights; // vectors to store in domain weights depending on number of gauss points used 
-			matrix2d line_weights; //vector to store in weights for the boundary integral depending on number of guass points used
 			matrix2d geoel;// data structure to store in domain data for each element
 				
 			//solution containers
-      //storage order nelem 
       // format for storage of  unkel(nelem,n_consvar,n_coeff)
 			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
 			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
+			matrix3d RK_stor; //storage for multi-stage RHS to store the current solution 
 			
-			// fv_U(i,) = rho | U | V | E 
-			matrix2d fv_U; //2d array to store in solution for P(0) DG finite volume
-			
+			//residual containers
+			matrix2d res_vec; //init during intialization of the flowfield
+			double res;
+				
 			//mesh methods
 			mesh(std::string s1, std::string s2); // advance function counter 0-1 constructor reads in mesh file, and control file
 	};
@@ -119,6 +113,11 @@ namespace grid
 		void set_massMat(grid::mesh &mesh1); 
 		matrix2d el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3);// calculate element jacobian 
   }
+	namespace run
+	{
+		void delta_T(grid::mesh &mesh1); //update the lcoal time step for every cell and store in geoel(i,14);
+		bool isSolnConverged(grid::mesh &mesh1); //check for convergence
+	}
   void construct(grid::mesh &mesh1);
 	// subroutines and methdos for post processing
 	namespace post_proc
