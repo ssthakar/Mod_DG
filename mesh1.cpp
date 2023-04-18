@@ -52,6 +52,11 @@ grid::mesh::mesh(std::string s1, std::string s2)
   ngauss_domn = c[2][0];
   domweight = c[3][0];
   bounweight = c[4][0];
+	U_infty.init(neqns, 1); //intial condition
+	U_infty(0,0) = c[5][0]; //reference density
+	U_infty(1,0) = cos(c[6][0]*const_properties::pi/180);//X velocity
+	U_infty(2,0) = sin(c[6][0]*const_properties::pi/180); //Y velocity
+	U_infty(3,0) = 0.5 + 1/(const_properties::gamma*(const_properties::gamma-1)*c[7][0]*c[7][0]);
 	// for loop populate intpoel matrix
 	inpoel.init(nelem, ntype); // init and give size to inpoel
 	for (int i = 0; i < nelem; i++)

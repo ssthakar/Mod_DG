@@ -8,10 +8,14 @@ class soln//instantiate at the beginning of the simulation
 	public:
 	double abstol;
 	int max_iter;
+	soln(grid::mesh &mesh1,std::string s1); //read in the control file and intialize the flowfield for the mesh
 };
 
 namespace DG
 {
+	void delta_T(grid::mesh &mesh1);
+	void residual(grid::mesh &mesh1);
+	bool isSolnConverged(grid::mesh &mesh1,soln &soln1);
 	double det(matrix2d &coords); //function to get dererminant of from any three points;
 	double circum_rad(matrix2d &coords); //function to get the radius of the circum-circle of a triangle
   double vel_sound(matrix2d &U); //get the speed of sound given the conservative variables vector 

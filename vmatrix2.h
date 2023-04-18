@@ -19,7 +19,8 @@ public:
   vmatrix2(const vmatrix2<T> &vector); //copy constructor
 	// methods
   void init(int nrows, int ncols);                       // initialize a vector and set all values to 0 using resize
-  void printMatrix(vmatrix2<T> &matrix, std::string s1); // method to print matrix to file
+  void reset(); //sets all members to zero used to reset solution_residual vector at each time step
+	void printMatrix(vmatrix2<T> &matrix, std::string s1); // method to print matrix to file
   int rows();
   int cols();
   int size();
@@ -130,5 +131,12 @@ void printMatrix(vmatrix2<T> &matrix, std::string s1)
     file << std::endl;
   }
 }
+
+template <class T>
+void vmatrix2<T>::reset()
+{
+	std::fill(m_vec.begin(),m_vec.end(),0);	
+}
+
  
 #endif

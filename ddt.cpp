@@ -75,23 +75,21 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 		ddt::RK3::RK_s1(mesh1);
 		ddt::RK3::RK_s2(mesh1);
 		ddt::RK3::RK_s3(mesh1);
-		iter_count++;
+		DG::residual(mesh1); //compute the residual;
 		//check for convergence and break if converged
-		if(grid::run::isSolnConverged(mesh1) == 1)
+		if(DG::isSolnConverged(mesh1,soln1) == 1)
 			break;
+		iter_count ++;
 	}
 }
 
-
-
-
-void ddt::RK3::RK_s1(grid::mesh &mesh1)
+void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 {
 	//update RHS to get the contribution of the latest solution state 
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
 	DG::rhsboun_iface(mesh1);
-	grid::run::delta_T(mesh1); //generate local time steps for every element 
+	DG::delta_T(mesh1); //generate local time steps for every element 
 	//step in time and update solution storage, keep RK storage the same
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
@@ -115,7 +113,7 @@ void ddt::RK3::RK_s2(grid::mesh &mesh1)
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
 	DG::rhsboun_iface(mesh1);
-	grid::run::delta_T(mesh1); //update local time steps for every element 
+	DG::delta_T(mesh1); //update local time steps for every element 
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
@@ -137,7 +135,7 @@ void ddt::RK3::RK_s3(grid::mesh &mesh1)
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
 	DG::rhsboun_iface(mesh1);
-	grid::run::delta_T(mesh1); //update local time steps for every element 
+	DG::delta_T(mesh1); //update local time steps for every element 
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
@@ -154,13 +152,53 @@ void ddt::RK3::RK_s3(grid::mesh &mesh1)
 
 }
 
-void grid::run::delta_T(grid::mesh &mesh1)
+void DG::delta_T(grid::mesh &mesh1)
 {
 	for(int i = 0;i<mesh1.nelem;i++)
 	{
 		mesh1.geoel(i,14) = ddt::local_ts(mesh1,i);
 	}
 }
+
+void DG::residual(grid::mesh &mesh1)
+{
+	mesh1.res_vec.reset(); //set all values to 0	
+	for(int i=0;i<mesh1.neqns;i++)
+	{
+		for(int m=0;m<mesh1.neqns;m++)
+		{
+			mesh1.res_vec(m,0) = mesh1.res_vec(m,0) + std::fabs(mesh1.unkel(i,m,0) - mesh1.RK_stor(i,m,0));
+		}
+	}
+}
+
+bool DG::isSolnConverged(grid::mesh &mesh1, soln &soln1)
+{
+	bool result = true;
+	for(int i=0;i<mesh1.neqns;i++)
+	{
+		if(mesh1.res_vec(i,0)>soln1.abstol)
+			result = false;
+	}
+	return result;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

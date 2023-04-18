@@ -31,9 +31,10 @@ typedef mMatrix3<double> matrix3d;
 //thermophysical constants 
 namespace const_properties
 {
+	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 0.95; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 1.0/4.0; //CFL to use in the local time stepping for pseudo transient integration
 
 }
 
@@ -89,10 +90,9 @@ namespace grid
 			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
 			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
 			matrix3d RK_stor; //storage for multi-stage RHS to store the current solution 
-			
+			matrix2d U_infty; //initial state from free stream conditions , generated with nmesh constructor , reads in data from control file
 			//residual containers
 			matrix2d res_vec; //init during intialization of the flowfield
-			double res;
 				
 			//mesh methods
 			mesh(std::string s1, std::string s2); // advance function counter 0-1 constructor reads in mesh file, and control file
@@ -113,11 +113,6 @@ namespace grid
 		void set_massMat(grid::mesh &mesh1); 
 		matrix2d el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3);// calculate element jacobian 
   }
-	namespace run
-	{
-		void delta_T(grid::mesh &mesh1); //update the lcoal time step for every cell and store in geoel(i,14);
-		bool isSolnConverged(grid::mesh &mesh1); //check for convergence
-	}
   void construct(grid::mesh &mesh1);
 	// subroutines and methdos for post processing
 	namespace post_proc
