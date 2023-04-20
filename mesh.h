@@ -110,10 +110,11 @@ namespace grid
 		void set_boun_geoface(grid::mesh &mesh1); //generates face data for all boundary faces
 		void set_int_geoface(grid::mesh &mesh1); //generates face data for all internal faces 
 		void set_geoel(grid::mesh &mesh1); //generates element data
-		void set_massMat(grid::mesh &mesh1); 
+		void set_massMat(grid::mesh &mesh1);
+		void update_esuel(grid::mesh &mesh1); //update the esuel data structure to incorporate boundary flags needed for local time stepping
 		matrix2d el_jacobian(double &x1,double &x2,double &x3,double &y1,double &y2,double &y3);// calculate element jacobian 
   }
-  void construct(grid::mesh &mesh1);
+	void construct(grid::mesh &mesh1);
 	// subroutines and methdos for post processing
 	namespace post_proc
 	{

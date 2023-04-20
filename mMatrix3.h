@@ -1,7 +1,7 @@
 // class to store 3d array in a 1d array with simple acess and config methods
 #ifndef mMatrix3_H
 #define mMatrix3_H
-
+#include "vmatrix2.h"
 #include <iostream>
 #include <cassert>
 #include <fstream>
@@ -50,7 +50,7 @@ mMatrix3<T>::mMatrix3(int x, int y, int z)
 	m_j = y;
 	m_k = z;
 	m_n = m_i*m_j*m_k; 
-	m_vec.resize(m_n,0.0);
+	m_vec.resize(m_n,lim_zero);
 }
 
 template<class T>
@@ -68,7 +68,7 @@ void mMatrix3<T>::init(int x, int y, int z)
 	m_j = y; //rows of the 2d slice 
 	m_k = z; //cols of the 2d slice 
 	m_n= x*y*z; //total elements
-  m_vec.resize(m_n,0.0);
+  m_vec.resize(m_n,lim_zero);
 }
 
 

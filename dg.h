@@ -22,6 +22,7 @@ namespace DG
 	matrix2d Fx(matrix2d &state);// get x direction flux from conservative variables  (standard flux nothing fancy)
 	matrix2d Fy(matrix2d &state);
 	matrix2d U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i); // get solution at point  given the point co-ordinates
+	matrix2d U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i,int e,double &nx,double &ny); //overload function to get state when we don't know if the cell is host or ghost
 	matrix2d get_state(grid::mesh &mesh1, int &i);						  // get conservative state vars of a particular elem
 	void init_field(grid::mesh &mesh1);
 	void rhsboun_bface(grid::mesh &mesh1); // calculate the contribution of the boundary integral from boundary faces
@@ -56,7 +57,6 @@ namespace FDS
 		void set_W_amp();  // compute and store in wave strength
 		void set_diss_flux();
 	public:
-		RoeFlux();
 		void compute_req(matrix2d &Ul, matrix2d &Ur, double &nx, double &ny); // constructor computes the averaged vars, stores in nx and ny
 		void compute_flux();
 		matrix2d flux_intface();
@@ -66,6 +66,7 @@ namespace FDS
 
 namespace ddt // time marching methods for local cells
 {
+	double local_ts1(grid::mesh &mesh1, int &i);
 	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace RK3 //TVD Runge Kutta 3 stage 
 	{

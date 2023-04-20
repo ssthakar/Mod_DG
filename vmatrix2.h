@@ -6,7 +6,7 @@
 #include <fstream>
 #include <cassert>
 #include <vector>
-
+const double lim_zero = 1e-15;
 //TODO implement iterator functionality for more control over access
 template <class T>
 class vmatrix2
@@ -48,7 +48,7 @@ vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
   m_rows = nrows;
   m_cols = ncols;
   m_n = m_rows * m_cols;
-  m_vec.resize(m_n, 0.0);
+  m_vec.resize(m_n, lim_zero);
 }
 
 template<class T>
@@ -111,7 +111,7 @@ void vmatrix2<T>::init(int nrows, int ncols)
   m_rows = nrows;
   m_cols = ncols;
   m_n = nrows * ncols;
-  m_vec.resize(m_n, 0.0);
+  m_vec.resize(m_n, lim_zero);
 }
 
 //simple function to print out arrays in .dat format for debugging and plotting
@@ -130,6 +130,22 @@ void printMatrix(vmatrix2<T> &matrix, std::string s1)
     }
     file << std::endl;
   }
+}
+
+template<class T>
+void print2Term(vmatrix2<T> &matrix)
+{
+	int nrows = matrix.rows();
+	int ncols = matrix.cols();
+  for (int row = 0; row < nrows; row++)
+  {
+    for (int col = 0; col < ncols; col++)
+    {
+			std::cout << matrix(row, col) << " ";
+    }
+		std::cout<< std::endl;
+
+	}
 }
 
 template <class T>

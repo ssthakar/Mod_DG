@@ -2,6 +2,7 @@
 #include "dg.h"
 #include <cmath>
 
+//reader function 
 std::vector<std::vector<double>> reader::readv(std::string s)
 {
 	std::vector<std::vector<double>> v;
@@ -32,6 +33,7 @@ std::vector<std::vector<double>> reader::readv(std::string s)
 	}
 	return v;
 }
+//end function
 
 // construtor for mesh class generates intpoel,coords and bface data sructures from mesh file
 grid::mesh::mesh(std::string s1, std::string s2)
@@ -85,6 +87,12 @@ grid::mesh::mesh(std::string s1, std::string s2)
 		}
 		bface(i, 4) = v[i + nelem + 2 * npoin + 12][3];
 	}
+	std::cout<<"Dimension: "<<ndimn<<std::endl;
+	std::cout<<"Number of cells: "<<nelem<<std::endl;
+	std::cout<<"Number of boundary faces: "<<nbface<<std::endl;
+	std::cout<<"Number of boundary Gauss points: "<<ngauss_boun<<std::endl;
+	std::cout<<"Number of domain Guass points: "<<ngauss_domn<<std::endl;
+	std::cout<<"Instantiation done."<<std::endl;
 }
 // end constructor
 
@@ -331,7 +339,7 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 {
 	assert(mesh1.func_count == 6);
-  	mesh1.func_count = 7;     // make sure geoel is inited
+  mesh1.func_count = 7;     // make sure geoel is inited
 	for (int i = 0; i < mesh1.nelem; i++)//loop over all elements
 	{
 		// get cell data from current mesh object
@@ -396,6 +404,7 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
 {
   assert(mesh1.func_count == 8);
+	mesh1.func_count =9; //update function count
   mesh1.boun_geoface.init(mesh1.nbface,7);
   for(int i=0;i<mesh1.nbface;i++) //loop through all the boundary faces
   {
@@ -424,7 +433,27 @@ void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
 // endsub
 
 
-
+//sub to update esuel and incorporate boundary flags in 0 positions for use in calculating the local time step 
+void grid::pre_proc::update_esuel(grid::mesh &mesh1)
+{
+	assert(mesh1.func_count == 9); //last pre proc function to run , must run after all other data structrures are generated
+	mesh1.func_count = 10; //update function count just in case i need to add another function 
+	for(int i =0;i<mesh1.nbface;i++) //loop through all boundary faces 
+	{
+		int &e = mesh1.bface(i,2); //get the host element for the bounddary face 
+		for(int j=0;j<mesh1.ntype;j++) //loop over all elements surrounding element 'e'
+		{
+			switch(mesh1.esuel(e-1,j))
+			{
+				case 0:
+					{
+						mesh1.esuel(e-1,j) = mesh1.bface(i,4)*-1 + 1; //push the boundary flag but with a negative value to not interfere with the actual element tags
+					}
+			}
+		}
+	}
+}
+//endsub
 
 // sub to  to write out mesh in .vtk format for paraview to read and visualize
 void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
@@ -482,7 +511,8 @@ double len(double &x1, double &x2, double &y1, double &y2)
 //assemble the mesh
 void grid::construct(grid::mesh &mesh1)
 {
-  grid::pre_proc::set_esup(mesh1); 
+	std::cout<<" started mesh pre_proc"<<std::endl;
+  grid::pre_proc::set_esup(mesh1);
   grid::pre_proc::set_esuel(mesh1);
   grid::pre_proc::set_bface(mesh1);
   grid::pre_proc::set_intface(mesh1);
@@ -490,6 +520,8 @@ void grid::construct(grid::mesh &mesh1)
   grid::pre_proc::set_massMat(mesh1);
   grid::pre_proc::set_int_geoface(mesh1);
   grid::pre_proc::set_boun_geoface(mesh1);
+	grid::pre_proc::update_esuel(mesh1);
+	std::cout<<"mesh pre-processing done."<<std::endl;
 }
 
 
