@@ -18,7 +18,7 @@
 #include <typeinfo>
 #include "mMatrix3.h" //for 3d storage container 
 #include "vmatrix2.h" //for 2d storage container 
-
+#include <fenv.h> 
 
 // convenient typedefs for ease of use
 // 2d arrays 
@@ -34,7 +34,7 @@ namespace const_properties
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 1.0/4.0; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 0.25; //CFL to use in the local time stepping for pseudo transient integration
 
 }
 
