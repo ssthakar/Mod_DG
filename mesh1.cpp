@@ -486,7 +486,7 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 double EOS::perf_gas(matrix2d &cons_var)
 {
 	double pressure;
-	pressure = (const_properties::gamma - 1) * cons_var(0, 0) * (cons_var(0, 0) - 0.5 / cons_var(0, 0) * (cons_var(1, 0) * cons_var(1, 0) + cons_var(2, 0) * cons_var(2, 0)));
+	pressure = (const_properties::gamma - 1) * (cons_var(3, 0) - 0.5 / cons_var(0, 0) * (cons_var(1, 0) * cons_var(1, 0) + cons_var(2, 0) * cons_var(2, 0)));
 	return pressure;
 }
 
