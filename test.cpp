@@ -7,7 +7,7 @@
 int main()
 {
 	auto start = std::chrono::high_resolution_clock::now();
-	grid::mesh mesh1("mesh/channel.txt","mesh/control.txt");
+	grid::mesh mesh1("mesh/naca.txt","mesh/control.txt");
 	grid::construct(mesh1);
   printMatrix(mesh1.intface,"intface.out");
   printMatrix(mesh1.bface, "bface.out");

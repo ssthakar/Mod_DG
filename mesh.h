@@ -34,7 +34,7 @@ namespace const_properties
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 0.25; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 0.1; //CFL to use in the local time stepping for pseudo transient integration
 
 }
 
@@ -93,7 +93,7 @@ namespace grid
 			matrix2d U_infty; //initial state from free stream conditions , generated with nmesh constructor , reads in data from control file
 			//residual containers
 			matrix2d res_vec; //init during intialization of the flowfield
-				
+			matrix2d cons_vec; //vector to check if mass is conserved;
 			//mesh methods
 			mesh(std::string s1, std::string s2); // advance function counter 0-1 constructor reads in mesh file, and control file
 	};

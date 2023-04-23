@@ -323,8 +323,8 @@ void grid::pre_proc::set_geoel(mesh &mesh1)
 		mesh1.geoel(i, 0) = grid::pre_proc::el_jacobian(x1, x2, x3, y1, y2, y3)(0,0);
 		mesh1.geoel(i, 1) = (x1 + x2 + x3) / 3; //xc  
 		mesh1.geoel(i, 2) = (y1 + y2 + y3) / 3; //yc
-		mesh1.geoel(i,3) = std::max({x1,x2,x3}) - std::min({x1,x2,x3}); // delta_x
-		mesh1.geoel(i,4) = std::max({y1,y2,y3}) - std::min({y1,y2,y3}); //delta_y 
+		mesh1.geoel(i,3) = 0.5*(std::max({x1,x2,x3}) - std::min({x1,x2,x3})); // delta_x
+		mesh1.geoel(i,4) = 0.5*(std::max({y1,y2,y3}) - std::min({y1,y2,y3})); //delta_y 
 		mesh1.geoel(i,5) = mesh1.coords(p1-1,0)*0.5 + mesh1.coords(p2-1,0)*0.5; //guass points for domain integral 
 		mesh1.geoel(i,6) = mesh1.coords(p1-1,1)*0.5 + mesh1.coords(p2-1,1)*0.5;
 		mesh1.geoel(i,7) = mesh1.coords(p2-1,0)*0.5 + mesh1.coords(p3-1,0)*0.5;
@@ -360,7 +360,7 @@ void grid::pre_proc::set_massMat(grid::mesh &mesh1)
 		double &delta_y = mesh1.geoel(i,4);
 		// get area of the triangle
 		double &A = mesh1.geoel(i,0);
-		mesh1.geoel(i,11) =  2*A/(delta_x*delta_y)*(x1*x1/12 + x1*x2/12 + x1*x3/12 - x1*xc/3 + x2*x2/12 + x2*x3/12 - x2*xc/3 + x3*x3/12 - x3*xc/3 + xc*xc/2);
+		mesh1.geoel(i,11) =  2*A/(delta_x*delta_x)*(x1*x1/12 + x1*x2/12 + x1*x3/12 - x1*xc/3 + x2*x2/12 + x2*x3/12 - x2*xc/3 + x3*x3/12 - x3*xc/3 + xc*xc/2);
 		mesh1.geoel(i,12) =  2*A/(delta_x*delta_y)*(x1*y1/12 + x1*y2/24 + x2*y1/24 + x1*y3/24 + x2*y2/12 + x3*y1/24 + x2*y3/24 + x3*y2/24 + x3*y3/12 - x1*yc/6- xc*y1/6 - x2*yc/6 - xc*y2/6 - x3*yc/6 - xc*y3/6 + xc*yc/2);
 		mesh1.geoel(i,13) =  2*A/(delta_y*delta_y)*(y1*y1/12 + y1*y2/12 + y1*y3/12 - y1*yc/3 + y2*y2/12 + y2*y3/12 - y2*yc/3 + y3*y3/12 - y3*yc/3 + yc*yc/2);
 	}
@@ -382,8 +382,8 @@ void grid::pre_proc::set_int_geoface(mesh &mesh1)
 		double &p1y = mesh1.coords(ip1 - 1, 1);
 		double &p2y = mesh1.coords(ip2 - 1, 1);
 		double mag = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
-		mesh1.int_geoface(i, 0) = (p2y - p1y)/mag; //unit normal vector components x and y 
-		mesh1.int_geoface(i, 1) = -1*(p2x-p1x)/mag;
+		mesh1.int_geoface(i, 0) = (p2y - p1y); //unit normal vector components x and y 
+		mesh1.int_geoface(i, 1) = -1*(p2x-p1x);
 		// compute the coords of the gauss points
 		double E1 = -1 / sqrt(3);
 		double E2 = 1 / sqrt(3);
@@ -415,8 +415,8 @@ void grid::pre_proc::set_boun_geoface(grid::mesh &mesh1)
     double &p2x = mesh1.coords(p2-1,0);
     double &p2y = mesh1.coords(p2-1,1);
     double mag = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));   
-    mesh1.boun_geoface(i,0) = (p2y - p1y)/mag; //unit normal vectors components x and yu
-    mesh1.boun_geoface(i,1) = (p1x - p2x)/mag;
+    mesh1.boun_geoface(i,0) = (p2y - p1y); //unit normal vectors components x and yu
+    mesh1.boun_geoface(i,1) = (p1x - p2x);
 		double E1 = -1 / sqrt(3);
 		double E2 = 1 / sqrt(3);
 		double gx1 = 0.5*((E1+1)*(p2x-p1x)) + p1x;

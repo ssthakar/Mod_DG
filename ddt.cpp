@@ -6,7 +6,7 @@
 double ddt::local_ts(grid::mesh &mesh1, int &i)
 {
   double denom = 0.0;
-  //std::cout<<"local timestep function for element called"<<std::endl;
+  std::cout<<"local timestep function for element called"<<std::endl;
 	double &area = mesh1.geoel(i,0); //area of the triangular element
 	const int &ip1 = mesh1.inpoel(i, 0); // get the points that make up the cell 
 	const int &ip2 = mesh1.inpoel(i, 1);
@@ -20,12 +20,12 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	double mag1 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
 	double mag2 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
 	double mag3 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
-	double nx1 = (p2y - p1y)/mag1; //unit normal vector components x and y 
-	double ny1 = -1*(p2x-p1x)/mag1;
-	double nx2 = (p3y - p2y)/mag2; //unit normal vector components x and y 
-	double ny2 = -1*(p3x-p2x)/mag2;
-	double nx3 = (p1y - p3y)/mag3; //unit normal vector components x and y 
-	double ny3 = -1*(p1x-p3x)/mag3;
+	double nx1 = (p2y - p1y); //unit normal vector components x and y 
+	double ny1 = -1*(p2x-p1x);
+	double nx2 = (p3y - p2y); //unit normal vector components x and y 
+	double ny2 = -1*(p3x-p2x);
+	double nx3 = (p1y - p3y); //unit normal vector components x and y 
+	double ny3 = -1*(p1x-p3x);
 	double len1 = len(p1x,p2x,p1y,p2y);
 	double len2 = len(p2x,p3x,p2y,p3y);
 	double len3 = len(p1x,p3x,p1y,p3y);
@@ -66,7 +66,7 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	}
   //std::cout<<"timestep: "<<i<<" "<<const_properties::CFL*area/denom<<std::endl;
   feenableexcept(FE_INVALID | FE_OVERFLOW);
-  //std::cout<<"local timestep function complete"<<std::endl;
+  std::cout<<"local timestep function complete"<<std::endl;
 	return const_properties::CFL*area/denom;
 }
 
@@ -94,7 +94,7 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 
 void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 {
-  //std::cout<<"stage 1 started"<<std::endl;
+  std::cout<<"stage 1 started"<<std::endl;
 	DG::rhsdomn(mesh1);
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
@@ -114,7 +114,7 @@ void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 			mesh1.unkel(i,m,2) = mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2);
 		}
 	}
-  //std::cout<<"stage 1 complete: "<<std::endl;
+  std::cout<<"stage 1 complete: "<<std::endl;
 }
 
 

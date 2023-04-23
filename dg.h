@@ -13,6 +13,7 @@ class soln//instantiate at the beginning of the simulation
 
 namespace DG
 {
+  void cons(grid::mesh &mesh1); //check if scheme is conservativeh
 	void delta_T(grid::mesh &mesh1);
 	void residual(grid::mesh &mesh1);
 	bool isSolnConverged(grid::mesh &mesh1,soln &soln1);
