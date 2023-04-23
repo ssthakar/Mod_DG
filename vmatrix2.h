@@ -1,4 +1,4 @@
-/* A simple template class to store in 2d arrays in flattened format in 1d vectors*/
+/* A simple template class to store in 3d arrays in flattened format in 1d vectors*/
 #ifndef VMATRIX_H
 #define VMATRIX_H
 #include <initializer_list>
