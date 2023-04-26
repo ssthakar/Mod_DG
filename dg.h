@@ -51,9 +51,11 @@ namespace FDS
 		matrix2d W_amp;// store in the wave amplitude
 		matrix2d avg_flux; // central averaged flux in cell normal direction
 	public:
+    double fl;
 		matrix2d lamda;
 		matrix2d intface_flux;
-	private:	
+	private:
+    matrix2d harten_corrector(); //adds the Harten correction
 		void set_lamda();  // compute and store in eign values of the problem
 		void set_W_amp();  // compute and store in wave strength
 		void set_diss_flux();

@@ -48,7 +48,7 @@ vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
   m_rows = nrows;
   m_cols = ncols;
   m_n = m_rows * m_cols;
-  m_vec.resize(m_n, lim_zero);
+  m_vec.resize(m_n, 0.0);
 }
 
 template<class T>
@@ -111,7 +111,7 @@ void vmatrix2<T>::init(int nrows, int ncols)
   m_rows = nrows;
   m_cols = ncols;
   m_n = nrows * ncols;
-  m_vec.resize(m_n, lim_zero);
+  m_vec.resize(m_n, 0.0);
 }
 
 //simple function to print out arrays in .dat format for debugging and plotting
@@ -151,7 +151,7 @@ void print2Term(vmatrix2<T> &matrix)
 template <class T>
 void vmatrix2<T>::reset()
 {
-	std::fill(m_vec.begin(),m_vec.end(),0);	
+	std::fill(m_vec.begin(),m_vec.end(),0.0);	
 }
 
  

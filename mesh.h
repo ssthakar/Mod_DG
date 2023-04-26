@@ -64,7 +64,7 @@ namespace grid
 			int ndegr; //taken from control file,// 1 for P(0) 3 for P(1) and 6 for P(2)
 			int ngauss_domn; // the number of gasss points for the domain integral taken from control file 
 			int ngauss_boun; // the number of gauss points for the boundary of each cell taken from control file
-			double A_min; //store in the smallest cell size for CFL condition and timestep calculation
+			double t_start; //store in the smallest cell size for CFL condition and timestep calculation
 			int nmaxface; //total number of faces in the mesh including internal and boundary
 			int nintface; // number of internal faces
 			int func_count; // function counter to count which function has been executed
