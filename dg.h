@@ -31,45 +31,15 @@ namespace DG
 	void rhsdomn(grid::mesh &mesh1);	   // calculate the contribution of the boundary integral to rhsel
 };
 
-namespace FDS
+
+namespace FVS
 {
-
-	// Roes averaged flux difference split with Harten's conrrection for the eigen values
-	class RoeFlux
-	{
-
-	private:
-		double Nx;
-		double Ny;
-		double delta_rho;
-		double deltaVx;
-		double deltaVy;
-		double deltaP;
-		double deltaVn;
-		matrix2d dissFlux; // disspative flux substracted from the CD
-		matrix2d avg;	   // store in Roes averaged vars, computed with object instantiation through the constructor
-		matrix2d W_amp;// store in the wave amplitude
-		matrix2d avg_flux; // central averaged flux in cell normal direction
-	public:
-    double fl;
-		matrix2d lamda;
-		matrix2d intface_flux;
-	private:
-    matrix2d harten_corrector(); //adds the Harten correction
-		void set_lamda();  // compute and store in eign values of the problem
-		void set_W_amp();  // compute and store in wave strength
-		void set_diss_flux();
-	public:
-		void compute_req(matrix2d &Ul, matrix2d &Ur, double &nx, double &ny); // constructor computes the averaged vars, stores in nx and ny
-		void compute_flux();
-		matrix2d flux_intface();
-	};
+  matrix2d Van_leer(grid::mesh &mesh1,matrix2d &Ul, matrix2d &Ur, double &nx, double &ny); //Van Leer FLux vector split
 }
 
 
 namespace ddt // time marching methods for local cells
 {
-	double local_ts1(grid::mesh &mesh1, int &i);
 	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace RK3 //TVD Runge Kutta 3 stage 
 	{

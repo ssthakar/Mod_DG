@@ -31,11 +31,12 @@ typedef mMatrix3<double> matrix3d;
 //thermophysical constants 
 namespace const_properties
 {
+  const double eps = 1e-7;
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
 	const double CFL = 0.1; //CFL to use in the local time stepping for pseudo transient integration
-
+  const double cp = gamma/(gamma-1); //dimensionless specific heat capacity
 }
 
 namespace EOS
@@ -87,7 +88,8 @@ namespace grid
 				
 			//solution containers
       // format for storage of  unkel(nelem,n_consvar,n_coeff)
-			matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
+			matrix2d fvunkel; //solution storage for finite volume
+      matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
 			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
 			matrix3d RK_stor; //storage for multi-stage RHS to store the current solution 
 			matrix2d U_infty; //initial state from free stream conditions , generated with nmesh constructor , reads in data from control file

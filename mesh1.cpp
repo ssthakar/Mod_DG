@@ -57,9 +57,10 @@ grid::mesh::mesh(std::string s1, std::string s2)
   t_start = c[10][0];
 	U_infty.init(neqns, 1); //intial condition
 	U_infty(0,0) = c[5][0]; //reference density
-	U_infty(1,0) = c[7][0]*cos(c[6][0]*const_properties::pi/180);//X velocity
-	U_infty(2,0) = c[7][0]*sin(c[6][0]*const_properties::pi/180); //Y velocity
-	U_infty(3,0) = 0.5 + 1/((const_properties::gamma-1)*c[7][0]*c[7][0]);
+	U_infty(1,0) = cos(c[6][0]*const_properties::pi/180);//X velocity
+	U_infty(2,0) = sin(c[6][0]*const_properties::pi/180); //Y velocity
+	double p0 = 1.0/(const_properties::gamma*c[7][0]*c[7][0]);
+  U_infty(3,0) = 0.5+p0/(const_properties::gamma-1);
 	// for loop populate intpoel matrix
 	inpoel.init(nelem, ntype); // init and give size to inpoel
 	for (int i = 0; i < nelem; i++)
@@ -242,7 +243,7 @@ void grid::pre_proc::set_bface(grid::mesh &mesh1)
 		for (int j = 0; j < mesh1.ntype; j++) // loop over all the faces of the element
 		{
 			int E = mesh1.esuel(i, j);
-			if (E == 0 and E - 1 < i) // this is a boundary cell and has boundar face
+			if (E == 0) // this is a boundary cell and has boundar face
 			{
 				mesh1.bface(bf, 3) = bf + 1 + mesh1.nelem;
 				int &p1 = mesh1.bface(bf, 0);
@@ -280,21 +281,21 @@ void grid::pre_proc::set_intface(grid::mesh &mesh1)
 		for (int j = 0; j < mesh1.ntype; j++) // loop over all faces of the element
 		{
 			int &e = mesh1.esuel(i, j); // get element surrouding current element
-			if (e != 0 and e < i + 1)	// this is an internal cell
+			if (e != 0 and e > i + 1)	// this is an internal cell
 			{
 				if (j != mesh1.ntype - 1)
 				{
 					mesh1.intface(m, 0) = mesh1.inpoel(i, j);
 					mesh1.intface(m, 1) = mesh1.inpoel(i, j + 1);
-					mesh1.intface(m, 2) = e;	 // left cell  i_e
-					mesh1.intface(m, 3) = i + 1; // right cell j_e
+					mesh1.intface(m, 2) = i+1;	 // left cell  i_e
+					mesh1.intface(m, 3) = e; // right cell j_e
 				}
 				else
 				{
 					mesh1.intface(m, 0) = mesh1.inpoel(i, 2);
 					mesh1.intface(m, 1) = mesh1.inpoel(i, 0);
-					mesh1.intface(m, 2) = e;
-					mesh1.intface(m, 3) = i + 1;
+					mesh1.intface(m, 2) = i+1;
+					mesh1.intface(m, 3) = e;
 				}
 				m++;
  			}

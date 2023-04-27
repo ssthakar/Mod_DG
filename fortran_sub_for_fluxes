@@ -1,0 +1,110 @@
+subroutine fluxes
+use GVD
+implicit none
+     
+integer   :: i,icell,jcell,gcell
+real*8    :: nx,ny,rho1,rhou1,rhov1,rhoe1,rho2,rhou2,rhov2, L
+real*8    :: rhoe2,vx1,vy1,vt1,vn1,vx2,vy2,vt2,vn2,pres1,csou1
+real*8    :: pres2, csou2,mach1,mach2
+real*8, dimension(4) :: flux1,flux2,flux, extunknow1, extunknow2
+real*8    :: eps=1e-6
+
+flux1= 0.0d0
+flux2= 0.0d0
+flux= 0.0d0
+rhsel(:,:)= 0.0d0
+
+do i=1, tface
+     
+  icell= intfac(1,i)  ! how to know which is left and which is right
+  jcell= intfac(2,i)
+
+  if (horder.eq.1) then
+    rho1= unknow(1,icell)
+    rhou1= unknow(2,icell)
+    rhov1= unknow(3,icell)
+    rhoe1= unknow(4,icell)
+
+    if (i.le.nbface) then ! for ghost values
+      gcell= jcell-nelem
+      rho2=  ghostunknow(1,gcell)
+      rhou2= ghostunknow(2,gcell)
+      rhov2= ghostunknow(3,gcell)
+      rhoe2= ghostunknow(4,gcell)
+      else
+      rho2= unknow(1,jcell)
+      rhou2= unknow(2,jcell)
+      rhov2= unknow(3,jcell)
+      rhoe2= unknow(4,jcell)
+    end if
+    ! higher order
+    else
+
+    call extrapolate(i, extunknow1, extunknow2)
+    rho1= extunknow1(1)
+    rhou1= extunknow1(2)
+    rhov1= extunknow1(3)
+    rhoe1= extunknow1(4)
+    rho2= extunknow2(1)
+    rhou2= extunknow2(2)
+    rhov2= extunknow2(3)
+    rhoe2= extunknow2(4)
+  end if
+  nx= norm(1,i)
+  ny= norm(2,i)
+  L= norm(3,i)    
+  vx1= rhou1/rho1
+  vy1= rhov1/rho1
+  vt1= sqrt(vx1**2+vy1**2)
+  vn1= vx1*nx+vy1*ny
+  pres1= (gam-1.0d0)*(rhoe1-.50d0*rho1*vt1**2)
+  csou1= sqrt(max(eps,gam*pres1/rho1))
+
+  vx2= rhou2/rho2
+  vy2= rhov2/rho2
+  vt2= sqrt(vx2**2+vy2**2)
+  vn2= vx2*nx+vy2*ny
+  pres2= (gam-1.0d0)*(rhoe2-.50d0*rho2*vt2**2)
+  csou2= sqrt(max(eps,gam*pres2/rho2))
+
+  mach1= vn1/csou1
+  mach2= vn2/csou2
+
+  if (mach1.gt.1.0d0) then
+    flux1(1)= rho1*vn1
+    flux1(2)= rho1*vn1*vx1+pres1*nx
+    flux1(3)= rho1*vn1*vy1+pres1*ny
+    flux1(4)= vn1*(rhoe1+pres1)
+    else if (mach1.lt.(-1.0d0)) then
+    flux1(:)= 0.0d0
+    else
+    flux1(1)= 0.250d0*rho1*csou1*(mach1+1.0d0)**2
+    flux1(2)= flux1(1)*(vx1+(nx*(-vn1+2.0d0*csou1))/gam)
+    flux1(3)= flux1(1)*(vy1+(ny*(-vn1+2.0d0*csou1))/gam)
+    flux1(4)= flux1(1)*(0.50d0*(vt1**2-vn1**2)+   &
+      &   (((gam-1.0d0)*vn1+2.0d0*csou1)**2)/(2.0d0*(gam**2-1.0d0)))
+
+  end if
+   
+  if (mach2.gt.1.0d0) then
+    flux2(:)= 0.0d0
+    else if (mach2.lt.(-1.0d0)) then
+    flux2(1)= rho2*vn2
+    flux2(2)= rho2*vn2*vx2+pres2*nx
+    flux2(3)= rho2*vn2*vy2+pres2*ny
+    flux2(4)= vn2*(rhoe2+pres2)
+    else
+    flux2(1)= -0.250d0*rho2*csou2*(mach2-1.0d0)**2
+    flux2(2)= flux2(1)*(vx2+(nx*(-vn2-2.0d0*csou2))/gam)
+    flux2(3)= flux2(1)*(vy2+(ny*(-vn2-2.0d0*csou2))/gam)
+    flux2(4)= flux2(1)*(0.50d0*(vt2**2-vn2**2)+   &
+      &   (((gam-1.0d0)*vn2-2.0d0*csou2)**2)/(2.0d0*(gam**2-1.0d0)))
+  end if
+
+  flux(:)= (flux1(:)+flux2(:))*L
+
+  rhsel(:,icell)= rhsel(:,icell)-flux(:)
+  rhsel(:,jcell)= rhsel(:,jcell)+ flux(:)
+
+end do
+

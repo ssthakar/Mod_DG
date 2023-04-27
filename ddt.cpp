@@ -86,8 +86,8 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 		mesh1.RK_stor = mesh1.unkel; //store the current solution for further use
 		//go through all the stages of the multi-stage method, update solution at final stage 
 		ddt::RK3::RK_s1(mesh1);
-		//ddt::RK3::RK_s2(mesh1);
-		//ddt::RK3::RK_s3(mesh1);
+		ddt::RK3::RK_s2(mesh1);
+		ddt::RK3::RK_s3(mesh1);
 		DG::residual(mesh1); //compute the residual;
 		
     std::cout<<"Residual: \n "<<mesh1.res_vec(0,0)<<"\n"<<mesh1.res_vec(1,0)<<"\n"<<mesh1.res_vec(2,0)<<"\n"<<mesh1.res_vec(3,0)<<std::endl;
@@ -103,26 +103,27 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 
 void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 {
-  
+  DG::delta_T(mesh1);
   std::cout<<"stage 1 started"<<std::endl;
-	DG::delta_T(mesh1);
+	//DG::delta_T(mesh1);
   DG::rhsdomn(mesh1);
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
-	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
+
+  for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
-		//double dT = 1e-9;
+		//double dT = 1e-5;
     double &dT = mesh1.geoel(i,14);
 		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
 			mesh1.unkel(i,m,0) = mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0);
-			mesh1.unkel(i,m,1) = mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2);
-			mesh1.unkel(i,m,2) = mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2);
+			//mesh1.unkel(i,m,1) = mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2);
+			//mesh1.unkel(i,m,2) = mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2);
 		}
-		std::cout<<"shshshs "<<i<<" "<<mesh1.unkel(i,2,0)<<std::endl;
+	  std::cout<<"shshshs "<<i<<" "<<mesh1.unkel(i,1,0)<<std::endl;
 	}
   std::cout<<"stage 1 complete: "<<std::endl;
 }
@@ -132,6 +133,7 @@ void ddt::RK3::RK_s2(grid::mesh &mesh1)
 {
   std::cout<<"stage 2 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
+  DG::delta_T(mesh1);
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
 	DG::rhsdomn(mesh1);
@@ -141,11 +143,12 @@ void ddt::RK3::RK_s2(grid::mesh &mesh1)
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
 		double &dT = mesh1.geoel(i,14);
-		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
+		//double dT = 1e-5;
+    for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
 			mesh1.unkel(i,m,0) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0));
-			mesh1.unkel(i,m,1) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2));
-			mesh1.unkel(i,m,2) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2));
+			//mesh1.unkel(i,m,1) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2));
+			//mesh1.unkel(i,m,2) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2));
 		}
 	}
   std::cout<<"stage 2 complete"<<std::endl;
@@ -155,6 +158,7 @@ void ddt::RK3::RK_s3(grid::mesh &mesh1)
 {
   std::cout<<"stage 3 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
+  DG::delta_T(mesh1);
 	DG::rhsdomn(mesh1);
 	DG::rhsboun_bface(mesh1);
 	DG::rhsboun_iface(mesh1);
@@ -164,11 +168,12 @@ void ddt::RK3::RK_s3(grid::mesh &mesh1)
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
 		double &dT = mesh1.geoel(i,14);
-		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
+		//double dT = 1e-5;
+    for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
 			mesh1.unkel(i,m,0) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0))/3;
-			mesh1.unkel(i,m,1) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
-			mesh1.unkel(i,m,2) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2))/3;
+			//mesh1.unkel(i,m,1) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
+			//mesh1.unkel(i,m,2) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2))/3;
 		}
 	}
 

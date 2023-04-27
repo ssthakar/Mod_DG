@@ -8,22 +8,23 @@ int main()
 {
   std::ofstream file("unkel.out");
 	auto start = std::chrono::high_resolution_clock::now();
-	grid::mesh mesh1("mesh/channel.txt","mesh/control.txt");
+	grid::mesh mesh1("mesh/test.txt","mesh/control.txt");
 	grid::construct(mesh1);
   std::cout<<"this the number of internal faces"<<mesh1.nintface<<std::endl;
   printMatrix(mesh1.intface,"intface.out");
   printMatrix(mesh1.bface, "bface.out");
   printMatrix(mesh1.boun_geoface,"boun_geoface.out");
-  printMatrix(mesh1.int_geoface, "int_geoface.out");
-	soln soln1(mesh1,"mesh/control.txt");
-  printMatrix(mesh1.U_infty,"initial.out");
-  ddt::RK3::RK3_outer(mesh1,soln1);
-  for(int i=0;i<42;i++)
+  printMatrix(mesh1.esuel, "esuel.out");
+	printMatrix(mesh1.int_geoface, "int_geoface.out");
+  soln soln1(mesh1,"mesh/control.txt");
+  //printMatrix(mesh1.U_infty,"initial.out");
+  //ddt::RK3::RK3_outer(mesh1,soln1);
+  for(int i=0;i<mesh1.nelem;i++)
   {
      
     for(int j=0;j<mesh1.neqns;j++)
     {
-      file<<DG::U_at_poin(mesh1,mesh1.geoel(i,5),mesh1.geoel(i,6),i)(2,0)<<" ";
+      file<<mesh1.unkel(i,1,0)<<std::endl;
     }
     file<<std::endl;
   }
@@ -46,6 +47,7 @@ int main()
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop -start);
 	std::cout<<duration.count()<<" microseconds "<<std::endl;
 	feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+  
   return 0;
 	
 }
