@@ -7,5 +7,5 @@
 0.0 //angle of attack
 1.1//Inlet Mach number
 1e-06 //Abstol
-1//Max iterations
+10//Max iterations
 1e-6

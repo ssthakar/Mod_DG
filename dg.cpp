@@ -40,12 +40,12 @@ void DG::init_field(grid::mesh &mesh1)
 double DG::vel_sound(matrix2d &Ul)
 {
   double eps1 = const_properties::eps;
-  std::cout<<"Ul_from vel"<<std::endl;
-  print2Term(Ul);
+  //std::cout<<"Ul_from vel"<<std::endl;
+  //print2Term(Ul);
   double ci2 = (const_properties::gamma*EOS::perf_gas(Ul)/Ul(0,0)); //return the speed of sound for a given conservative variable vector
   //std::cout<<ci2<<std::endl;
-  //return sqrt(std::max(ci2,eps1));
-  return sqrt(ci2);
+  return sqrt(std::max(ci2,eps1));
+  //return sqrt(ci2);
 }
 
 matrix2d DG::U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i)
@@ -304,6 +304,7 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
 
 matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx, double &ny)
 {
+  double gam = const_properties::gamma;
   //std::cout<<"inputs to flux functions"<<std::endl;
   //print2Term(Ul);
   //std::cout<<"_____"<<std::endl;
@@ -339,7 +340,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
     f_plus(0,0) = 0.25*Ul(0,0)*ci*std::pow((Mi_n+1),2);
     f_plus(1,0) = f_plus(0,0)*(Ul(1,0)*invRhoL+ nx*(-Vi_n+2*ci)/const_properties::gamma);
     f_plus(2,0) = f_plus(0,0)*(Ul(2,0)*invRhoL+ ny*(-Vi_n+2*ci)/const_properties::gamma);
-    f_plus(3,0) = 0.5*(u*u + v*v - Vi_n*Vi_n) + 0.5*std::pow(((const_properties::gamma-1)*Vi_n+2*ci),2)/(const_properties::gamma*const_properties::gamma-1);
+    f_plus(3,0) = f_plus(0,0)*(0.5*(u*u + v*v - Vi_n*Vi_n) + 0.5*std::pow(((const_properties::gamma-1)*Vi_n+2*ci),2)/(const_properties::gamma*const_properties::gamma-1));
   }
   // compute negative fluxes for right cell j
   if(Mj_n>1)
@@ -362,7 +363,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
     f_minus(0,0) = -0.25*Ur(0,0)*cj*std::pow((Mj_n-1),2);
     f_minus(1,0) = f_minus(0,0)*(Ur(1,0)*invRhoR+ nx*(-Vj_n-2*cj)/const_properties::gamma);
     f_minus(2,0) = f_minus(0,0)*(Ur(2,0)*invRhoR+ ny*(-Vj_n-2*cj)/const_properties::gamma);
-    f_minus(3,0) = 0.5*(u*u + v*v - Vj_n*Vj_n) + 0.5*std::pow(((const_properties::gamma-1)*Vj_n-2*cj),2)/(const_properties::gamma*const_properties::gamma-1);
+    f_minus(3,0) = f_minus(0,0)*(0.5*(u*u + v*v - Vj_n*Vj_n) + 0.5*std::pow(((const_properties::gamma-1)*Vj_n-2*cj),2)/(const_properties::gamma*const_properties::gamma-1));
   }
 
   flux(0,0) = f_plus(0,0) + f_minus(0,0);
@@ -375,7 +376,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
 
 matrix2d DG::fv_state(grid::mesh &mesh1, int i)
 {
-  std::cout<<"normal overload func"<<std::endl;
+  //std::cout<<"normal overload func"<<std::endl;
   matrix2d U(4,1);
   for(int k=0;k<mesh1.neqns;k++)
     U(k,0) = mesh1.fvunkel(i,k);
@@ -400,8 +401,8 @@ void DG::fv_rhsboun_bface(grid::mesh &mesh1)
       Ur(0,0) = Ul(0,0); //density 
       Ur(1,0) = Ul(1,0)*nx -2*(Ul(1,0)*nx + Ul(2,0)*ny)*nx;
       Ur(2,0) = Ul(2,0)*ny -2*(Ul(1,0)*nx + Ul(2,0)*ny)*ny;
-      std::cout<<"bface ghost cell state"<<std::endl;
-      print2Term(Ur);
+      //std::cout<<"bface ghost cell state"<<std::endl;
+      //print2Term(Ur);
       //call Reimann flux function to get interface flux
       matrix2d flux = FVS::Van_leer(mesh1,Ul, Ur, nx, ny);                            
       
@@ -453,24 +454,24 @@ matrix2d DG::fv_state(grid::mesh &mesh1, int i, int e, double &nx, double &ny)
   matrix2d host = DG::fv_state(mesh1,i);
   if(e==-2)
   {
-    std::cout<<"wall cell overload"<<std::endl;
+    //std::cout<<"wall cell overload"<<std::endl;
     U(0,0) = host(0,0);
     U(3,0) = host(3,0);
     U(1,0) = host(1,0)*nx - 2*(host(1,0)*nx + host(2,0)*ny)*nx;
     U(2,0) = host(2,0)*ny - 2*(host(1,0)*nx + host(2,0)*ny)*ny;
-    std::cout<<"wall cell overload complete"<<std::endl;
+    //std::cout<<"wall cell overload complete"<<std::endl;
   }
   else if(e==-4)
   {
-    std::cout<<"far field overload"<<std::endl;
+    //std::cout<<"far field overload"<<std::endl;
     U = mesh1.U_infty;
-    std::cout<<"far field complete"<<std::endl;
+    //std::cout<<"far field complete"<<std::endl;
   }
   else
   {
-    std::cout<<"normal call"<<std::endl;
+    //std::cout<<"normal call"<<std::endl;
     U = DG::fv_state(mesh1,e);
-    std::cout<<"end normal call"<<std::endl;
+    //std::cout<<"end normal call"<<std::endl;
   }
   //std::cout<<"overload complete"<<std::endl;
   return U;   

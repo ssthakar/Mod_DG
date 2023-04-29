@@ -7,7 +7,7 @@
 double ddt::local_ts(grid::mesh &mesh1, int &i)
 {
   double denom = 0.0;
-  std::cout<<"local timestep function for element called: "<<i<<std::endl;
+  //std::cout<<"local timestep function for element called: "<<i<<std::endl;
 	double &area = mesh1.geoel(i,0); //area of the triangular element
 	const int &ip1 = mesh1.inpoel(i, 0); // get the points that make up the cell 
 	const int &ip2 = mesh1.inpoel(i, 1);
@@ -30,7 +30,7 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	double len1 = len(p1x,p2x,p1y,p2y);
 	double len2 = len(p2x,p3x,p2y,p3y);
 	double len3 = len(p1x,p3x,p1y,p3y);
-  std::cout<<nx1*nx1 + ny1*ny1<<std::endl;
+  //std::cout<<nx1*nx1 + ny1*ny1<<std::endl;
   for(int j=0;j<mesh1.ntype;j++)  //loop over all the edges of the cell 
 	{
 		switch(j)
@@ -40,10 +40,10 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 				matrix2d Ui = DG::fv_state(mesh1,i);
         matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j) - 1,nx1,ny1);
 			  //std::cout<<"break point 68"<<EOS::perf_gas(Uj)<<std::endl;
-        std::cout<<"left cell"<<std::endl;
+        //std::cout<<"left cell"<<std::endl;
         double ci = DG::vel_sound(Ui);
 				
-        std::cout<<"left cell"<<std::endl;
+        //std::cout<<"left cell"<<std::endl;
         double cj = DG::vel_sound(Uj);
         
         denom = denom + len1*0.5*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx1 + Uj(1,0)/Uj(0,0)*nx1 + Ui(2,0)/Ui(0,0)*ny1 + Uj(2,0)/Uj(0,0)*ny1));
@@ -52,9 +52,9 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 			case 1:
 			{
   			matrix2d Ui = DG::fv_state(mesh1,i);
-        std::cout<<"left cell"<<std::endl;
+        //std::cout<<"left cell"<<std::endl;
         matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j)-1,nx2,ny2);      //std::cout<<" case 1"<<std::endl;
-        std::cout<<"right cell"<<std::endl;
+        //std::cout<<"right cell"<<std::endl;
 				double ci = DG::vel_sound(Ui);
 		 	  //std::cout<<"break point 69"<<std::endl;
 				double cj = DG::vel_sound(Uj);
@@ -64,9 +64,9 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 			case 2:
 			{
  				matrix2d Ui = DG::fv_state(mesh1,i);
-        std::cout<<"left cell"<<std::endl;
+        //std::cout<<"left cell"<<std::endl;
         matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j) - 1,nx3,ny3);       //std::cout<<" case 2"<<std::endl;
-        std::cout<<"right cell"<<std::endl;
+        //std::cout<<"right cell"<<std::endl;
 				double ci = DG::vel_sound(Ui);
 				double cj = DG::vel_sound(Uj);
 				denom = denom + 0.5*len3*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx3 + Uj(1,0)/Uj(0,0)*nx3 + Ui(2,0)/Ui(0,0)*ny3 + Uj(2,0)/Uj(0,0)*ny3));
@@ -76,7 +76,7 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	}
   //std::cout<<"timestep: "<<i<<" "<<const_properties::CFL*area/denom<<std::endl;
   feenableexcept(FE_INVALID | FE_OVERFLOW);
-  std::cout<<"local timestep function complete"<<std::endl;
+  //std::cout<<"local timestep function complete"<<std::endl;
 	return area/denom;
 }
 
@@ -93,8 +93,8 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 		
     ddt::RK3::RK_s1(mesh1);
     std::cout<<"timestep global is: "<<mesh1.dt<<std::endl;
-    //ddt::RK3::RK_s2(mesh1);
-		//ddt::RK3::RK_s3(mesh1);
+    ddt::RK3::RK_s2(mesh1);
+		ddt::RK3::RK_s3(mesh1);
 		DG::residual(mesh1); //compute the residual;
 		  
     std::cout<<"Residual: \n "<<mesh1.res_vec(0,0)<<"\n"<<mesh1.res_vec(1,0)<<"\n"<<mesh1.res_vec(2,0)<<"\n"<<mesh1.res_vec(3,0)<<std::endl;
@@ -193,7 +193,7 @@ void DG::delta_T(grid::mesh &mesh1)
     //std::cout<<"element: "<<i<<std::endl;  
     feenableexcept(FE_INVALID);
   }
-  mesh1.dt = *std::min_element(mesh1.Ltimestep.begin(),mesh1.Ltimestep.end());
+  mesh1.dt = *std::min_element(mesh1.Ltimestep.begin(),mesh1.Ltimestep.end())*const_properties::CFL;
 }
 
 void DG::residual(grid::mesh &mesh1)
