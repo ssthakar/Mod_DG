@@ -31,11 +31,11 @@ typedef mMatrix3<double> matrix3d;
 //thermophysical constants 
 namespace const_properties
 {
-  const double eps = 1e-7;
+  const double eps = 1e-6;
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 0.1; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 0.2; //CFL to use in the local time stepping for pseudo transient integration
   const double cp = gamma/(gamma-1); //dimensionless specific heat capacity
 }
 
@@ -71,7 +71,9 @@ namespace grid
 			int func_count; // function counter to count which function has been executed
 			double domweight; //weights for domain gauss quadrature
       double bounweight; //weigths for boundary domain quadrature
-			//control format ndegr|ngauss_boun|ngauss_domn
+      std::vector<double> Ltimestep;
+      double dt;
+      //control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
 
 			//mesh data structures
@@ -89,6 +91,8 @@ namespace grid
 			//solution containers
       // format for storage of  unkel(nelem,n_consvar,n_coeff)
 			matrix2d fvunkel; //solution storage for finite volume
+      matrix2d fvrhsel;
+      matrix2d fvRkstor; //storage for calculating the residual
       matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
 			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
 			matrix3d RK_stor; //storage for multi-stage RHS to store the current solution 

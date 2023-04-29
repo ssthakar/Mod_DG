@@ -13,6 +13,12 @@ class soln//instantiate at the beginning of the simulation
 
 namespace DG
 {
+  matrix2d fv_state(grid::mesh &mesh1, int i); //gives the finite volume state for any cell i
+  void fv_rhsboun_iface(grid::mesh &mesh1); //sub to compute the bounday contribution for finite volume only internal faces 
+  matrix2d fv_state(grid::mesh &mesh1, int i,int e, double &nx, double &ny); //gives the finite volume state for any cell i
+  void fv_rhsboun_bface(grid::mesh &mesh1); //sub to compute the boundary contribution for finitie volume only boundary faces 
+
+
   void cons(grid::mesh &mesh1); //check if scheme is conservativeh
 	void delta_T(grid::mesh &mesh1);
 	void residual(grid::mesh &mesh1);
@@ -40,6 +46,7 @@ namespace FVS
 
 namespace ddt // time marching methods for local cells
 {
+  double calc_ts(grid::mesh &mesh1); //sub to calculate global timestep
 	double local_ts(grid::mesh &mesh1,int &i); // method to calculate the allowed delta T for all cells (local time step)
 	namespace RK3 //TVD Runge Kutta 3 stage 
 	{

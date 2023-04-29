@@ -18,6 +18,10 @@ soln::soln(grid::mesh &mesh1, std::string s1)
 //subroutine to intialize the flow field 
 void DG::init_field(grid::mesh &mesh1)
 {
+  mesh1.fvRkstor.init(mesh1.nelem,mesh1.neqns);
+  mesh1.fvunkel.init(mesh1.nelem,mesh1.neqns);
+  mesh1.fvrhsel.init(mesh1.nelem,mesh1.neqns);
+  mesh1.Ltimestep.resize(mesh1.nelem,0);
 	mesh1.unkel.init(mesh1.nelem,mesh1.neqns,mesh1.ndegr); //initialize the flow field container 
 	mesh1.rhsel.init(mesh1.nelem,mesh1.neqns,mesh1.ndegr); //initialize the RHS vector  container 
 	mesh1.res_vec.init(mesh1.neqns,1); //intialize the residual vector
@@ -25,6 +29,7 @@ void DG::init_field(grid::mesh &mesh1)
 	{
 		for(int m = 0;m<mesh1.neqns;m++)
 		{
+      mesh1.fvunkel(i,m) = mesh1.U_infty(m,0);
 			mesh1.unkel(i,m,0) = mesh1.U_infty(m,0); //pass in free stram values to first coeffcient, assuming no variation of flow field properties in the cell, the gradients will therefore be 0;
 		}
 	}
@@ -34,21 +39,13 @@ void DG::init_field(grid::mesh &mesh1)
 //function to return the velocity of sound from state at any given point
 double DG::vel_sound(matrix2d &Ul)
 {
+  double eps1 = const_properties::eps;
   std::cout<<"Ul_from vel"<<std::endl;
   print2Term(Ul);
   double ci2 = (const_properties::gamma*EOS::perf_gas(Ul)/Ul(0,0)); //return the speed of sound for a given conservative variable vector
-  double ci;
-  if(ci2<0)
-  {  
-    ci = const_properties::eps;
-  }
-  else
-  {
-    ci = sqrt(ci2);
-  }
-  std::cout<<ci2<<std::endl;
-  return ci;
-  
+  //std::cout<<ci2<<std::endl;
+  //return sqrt(std::max(ci2,eps1));
+  return sqrt(ci2);
 }
 
 matrix2d DG::U_at_poin(grid::mesh &mesh1, double &gx, double &gy, int i)
@@ -132,9 +129,9 @@ void DG::rhsdomn(grid::mesh &mesh1) // pass reference to the mesh object
       //std::cout<<"inner for loop starts "<<j<<std::endl;
       //get conservative vars at current guass point 
       matrix2d U = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
-      std::cout<<"rhsdomn: "<<std::endl;
+      //std::cout<<"rhsdomn: "<<std::endl;
       matrix2d shit = Fx(U);
-       print2Term(shit);
+       //print2Term(shit);
       //push right hand side to correnct locations
       mesh1.rhsel(i, 0, 1) = mesh1.rhsel(i, 0, 1) - mesh1.geoel(i,0)*mesh1.domweight*DG::Fx(U)(0,0)*mesh1.geoel(i,1)/mesh1.geoel(i,3); //DG::Fx and DG::Fy are functions that return the x and y flux vector 
       mesh1.rhsel(i, 0, 2) = mesh1.rhsel(i, 0, 2) - mesh1.geoel(i,0)*mesh1.domweight*DG::Fy(U)(0,0)*mesh1.geoel(i,2)/mesh1.geoel(i,4);
@@ -150,7 +147,7 @@ void DG::rhsdomn(grid::mesh &mesh1) // pass reference to the mesh object
       //std::cout<<"inner loop pushes complete"<<std::endl;
     }
   }
-  std::cout<<"rhsdomn done:"<<std::endl;
+  //std::cout<<"rhsdomn done:"<<std::endl;
 }
 //ensdub
 // sub to push the contribution of the boundary integral to rhsel from bface only
@@ -158,7 +155,7 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
 {
 
   feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT); 
-  std::cout<<"rhsbface called"<<std::endl;
+  //std::cout<<"rhsbface called"<<std::endl;
   assert(mesh1.unkel.size() > 1);        // make sure intialization of the flow field is done and the storage container is resized
   for (int i = 0; i < mesh1.nbface; i++) // loop over all boundary faces
   {
@@ -169,80 +166,76 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
     double nx = mesh1.boun_geoface(i,0);
     double ny = mesh1.boun_geoface(i,1);
    // std::cout<<"before switch "<<std::endl;
-    switch(mesh1.bface(i,4)) //check which kind of boundary condition it is
+    if(mesh1.bface(i,4) ==2)
     {
-      //solid wall flag is 2
-      case 2:
+      //std::cout<<"case  wall cell"<<std::endl;
+      for(int j=0;j<mesh1.ngauss_boun;j++) //loop over all gauss points of the boundary
       {
-        //std::cout<<"case  wall cell"<<std::endl;
-        for(int j=0;j<mesh1.ngauss_boun;j++) //loop over all gauss points of the boundary
-        {
-          matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le-1);
-					matrix2d Ur(4,1); //init the right storage, this belongs to a ghost cell
-					Ur(0,0) = Ul(0,0); //density
-          Ur(3,0) = Ul(3,0);//energy
-          // compute velocity using mirror images
-					Ur(1,0) = Ul(1,0) - 2*(Ul(1,0)*nx+ Ul(2,0)*ny)*nx;
-          Ur(2,0) = Ul(2,0) - 2*(Ul(1,0)*nx + Ul(2,0)*ny)*ny;
+        matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le-1);
+				matrix2d Ur(4,1); //init the right storage, this belongs to a ghost cell
+				Ur(0,0) = Ul(0,0); //density
+        Ur(3,0) = Ul(3,0);//energy
+        // compute velocity using mirror images
+				Ur(1,0) = Ul(1,0) - 2*(Ul(1,0)*nx+ Ul(2,0)*ny)*nx;
+        Ur(2,0) = Ul(2,0) - 2*(Ul(1,0)*nx + Ul(2,0)*ny)*ny;
 					
-          std::cout<<" wall cell flux called for face: "<<i<<std::endl;
+        //std::cout<<" wall cell flux called for face: "<<i<<std::endl;
           
-          matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny); //reference to interface flux
+        matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny); //reference to interface flux
           //std::cout<<"before pushes1"<<std::endl;
           //pushes to the left element only as the right element is a ghost cell 
-          mesh1.rhsel(le-1, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
-          mesh1.rhsel(le-1, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
-          mesh1.rhsel(le-1, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
+        print2Term(flux);
+        mesh1.rhsel(le-1, 0, 0)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
+        mesh1.rhsel(le-1, 0, 1)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
+        mesh1.rhsel(le-1, 0, 2)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
       
-          mesh1.rhsel(le-1, 1, 0)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
-          mesh1.rhsel(le-1, 1, 1)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
-          mesh1.rhsel(le-1, 1, 2)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,0)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
+        mesh1.rhsel(le-1, 1, 0)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
+        mesh1.rhsel(le-1, 1, 1)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
+        mesh1.rhsel(le-1, 1, 2)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,0)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
       
-          mesh1.rhsel(le-1, 2, 0)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
-          mesh1.rhsel(le-1, 2, 1)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
-          mesh1.rhsel(le-1, 2, 2)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
+        mesh1.rhsel(le-1, 2, 0)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
+        mesh1.rhsel(le-1, 2, 1)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
+        mesh1.rhsel(le-1, 2, 2)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
       
-          mesh1.rhsel(le-1, 3, 0)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
-          mesh1.rhsel(le-1, 3, 1)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
-          mesh1.rhsel(le-1, 3, 2)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2);
-        }
-        break;
+        mesh1.rhsel(le-1, 3, 0)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
+        mesh1.rhsel(le-1, 3, 1)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
+        mesh1.rhsel(le-1, 3, 2)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2);
       }
+      
+    }
       //far field flag is 4 
-      case 4:
+    else
+    {
+      //std::cout<<"far field cell"<<std::endl;
+      for(int j=0;j<mesh1.ngauss_boun;j++)
       {
-        //std::cout<<"far field cell"<<std::endl;
-        for(int j=0;j<mesh1.ngauss_boun;j++)
-        {
-          matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le-1);
-          //print2Term(Ul);
-          matrix2d Ur(4,1);
-					Ur = mesh1.U_infty;
-          matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny); //reference to interface flux
-					//pushes to the left element only as the right element is a ghost cell 
-         // 
-         // print2Term(flux);
-          mesh1.rhsel(le-1, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
-          mesh1.rhsel(le-1, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
-          mesh1.rhsel(le-1, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
+        matrix2d Ul = DG::U_at_poin(mesh1,mesh1.boun_geoface(i,2*j+2),mesh1.boun_geoface(i,2*j+3),le-1);
+        //print2Term(Ul);
+        matrix2d Ur(4,1);
+				Ur = mesh1.U_infty;
+        matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny); //reference to interface flux
+				//pushes to the left element only as the right element is a ghost cell 
+        // 
+        // print2Term(flux);
+        mesh1.rhsel(le-1, 0, 0)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
+        mesh1.rhsel(le-1, 0, 1)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
+        mesh1.rhsel(le-1, 0, 2)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
       
-          mesh1.rhsel(le-1, 1, 0)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
-          mesh1.rhsel(le-1, 1, 1)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
-          mesh1.rhsel(le-1, 1, 2)  = flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
+        mesh1.rhsel(le-1, 1, 0)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
+        mesh1.rhsel(le-1, 1, 1)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
+        mesh1.rhsel(le-1, 1, 2)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
       
-          mesh1.rhsel(le-1, 2, 0)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
-          mesh1.rhsel(le-1, 2, 1)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
-          mesh1.rhsel(le-1, 2, 2)  = flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
+        mesh1.rhsel(le-1, 2, 0)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
+        mesh1.rhsel(le-1, 2, 1)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
+        mesh1.rhsel(le-1, 2, 2)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
       
-          mesh1.rhsel(le-1, 3, 0)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
-          mesh1.rhsel(le-1, 3, 1)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
-          mesh1.rhsel(le-1, 3, 2)  = flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2); 
-        }
-        break;
+        mesh1.rhsel(le-1, 3, 0)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
+        mesh1.rhsel(le-1, 3, 1)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
+        mesh1.rhsel(le-1, 3, 2)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2); 
       }
     }
   }
-  std::cout<<"rhsbface done"<<std::endl;
+  //std::cout<<"rhsbface done"<<std::endl;
 }
 
 // endsub
@@ -266,42 +259,42 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
       matrix2d Ur = DG::U_at_poin(mesh1, mesh1.int_geoface(i, 2*j + 2), mesh1.int_geoface(i, 2*j + 3), re-1);
       // left hand side pushes, flux contribution added due to normal vector and flux vector being in the same direction
       matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny);// refrence to flux vector obtained from Roes reimann flux solver
-      std::cout<<"iface flux for face :"<<i<<std::endl;
+      //std::cout<<"iface flux for face :"<<i<<std::endl;
       //print2Term(flux); 
       
-      print2Term(flux);
-      mesh1.rhsel(le-1, 0, 0)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
-      mesh1.rhsel(le-1, 0, 1)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
-      mesh1.rhsel(le-1, 0, 2)  = flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
+      //print2Term(flux);
+      mesh1.rhsel(le-1, 0, 0)  = -0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,0, 0);
+      mesh1.rhsel(le-1, 0, 1)  = 0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,0,1);
+      mesh1.rhsel(le-1, 0, 2)  = 0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,0,2);
       
-      mesh1.rhsel(le-1, 1, 0)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
-      mesh1.rhsel(le-1, 1, 1)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
-      mesh1.rhsel(le-1, 1, 2)  = flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
+      mesh1.rhsel(le-1, 1, 0)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,1, 0);
+      mesh1.rhsel(le-1, 1, 1)  = 0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,1,1);
+      mesh1.rhsel(le-1, 1, 2)  = 0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,1,2);
       
-      mesh1.rhsel(le-1, 2, 0)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
-      mesh1.rhsel(le-1, 2, 1)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
-      mesh1.rhsel(le-1, 2, 2)  = flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
+      mesh1.rhsel(le-1, 2, 0)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,2, 0);
+      mesh1.rhsel(le-1, 2, 1)  = 0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,2,1);
+      mesh1.rhsel(le-1, 2, 2)  = 0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,2,2);
       
-      mesh1.rhsel(le-1, 3, 0)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
-      mesh1.rhsel(le-1, 3, 1)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
-      mesh1.rhsel(le-1, 3, 2)  = flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2);
+      mesh1.rhsel(le-1, 3, 0)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(le-1,3, 0);
+      mesh1.rhsel(le-1, 3, 1)  = 0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,3,1);
+      mesh1.rhsel(le-1, 3, 2)  = 0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,3,2);
       
 			//right hand side pushes flux contribution substracted due to the opposing direction of the outward normal
-      mesh1.rhsel(re-1, 0, 0)  =  -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,0, 0);
-      mesh1.rhsel(re-1, 0, 1)  =  -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,0,1);
-      mesh1.rhsel(re-1, 0, 2)  =  -flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,0,2);
+      mesh1.rhsel(re-1, 0, 0)  =  0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,0, 0);
+      mesh1.rhsel(re-1, 0, 1)  =  0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,0,1);
+      mesh1.rhsel(re-1, 0, 2)  =  -0.5*flux(0,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,0,2);
       
-      mesh1.rhsel(re-1, 1, 0)  = -flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,1, 0);
-      mesh1.rhsel(re-1, 1, 1)  = -flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,1,1);
-      mesh1.rhsel(re-1, 1, 2)  = -flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,1,2);
+      mesh1.rhsel(re-1, 1, 0)  = 0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,1, 0);
+      mesh1.rhsel(re-1, 1, 1)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,1,1);
+      mesh1.rhsel(re-1, 1, 2)  = -0.5*flux(1,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,1,2);
       
-      mesh1.rhsel(re-1, 2, 0)  = -flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,2, 0);
-      mesh1.rhsel(re-1, 2, 1)  = -flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,2,1);
-      mesh1.rhsel(le-1, 2, 2)  = -flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,2,2);
+      mesh1.rhsel(re-1, 2, 0)  = 0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,2, 0);
+      mesh1.rhsel(re-1, 2, 1)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,2,1);
+      mesh1.rhsel(le-1, 2, 2)  = -0.5*flux(2,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,2,2);
      
-      mesh1.rhsel(re-1, 3, 0)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,3, 0);
-      mesh1.rhsel(re-1, 3, 1)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,3,1);
-      mesh1.rhsel(re-1, 3, 2)  = -flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,3,2);
+      mesh1.rhsel(re-1, 3, 0)  = 0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6) + mesh1.rhsel(re-1,3, 0);
+      mesh1.rhsel(re-1, 3, 1)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(re-1,1))/mesh1.geoel(re-1,3) + mesh1.rhsel(re-1,3,1);
+      mesh1.rhsel(re-1, 3, 2)  = -0.5*flux(3,0)*mesh1.bounweight*mesh1.int_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(re-1,2))/mesh1.geoel(re-1,4) + mesh1.rhsel(re-1,3,2);
     }
   }
   //std::cout<<"iface complete"<<std::endl;
@@ -311,6 +304,10 @@ void DG::rhsboun_iface(grid::mesh &mesh1)
 
 matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx, double &ny)
 {
+  //std::cout<<"inputs to flux functions"<<std::endl;
+  //print2Term(Ul);
+  //std::cout<<"_____"<<std::endl;
+  //print2Term(Ur);
   matrix2d flux(4,1);
   matrix2d f_plus(4,1);
   matrix2d f_minus(4,1);
@@ -322,7 +319,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
   double Vj_n = (Ur(1,0)*nx + Ur(2,0)*ny)*invRhoR;
   double Mi_n = Vi_n/ci;
   double Mj_n = Vj_n/cj;
-  std::cout<<"Mi: "<<Vi_n<<" Mj: "<<Vj_n<<std::endl;
+  //std::cout<<"Mi: "<<Mi_n<<" Mj: "<<Mj_n<<std::endl;
   //compute positive fluxes for left cell i 
   if(Mi_n>1)
   {
@@ -372,15 +369,119 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
   flux(1,0) = f_plus(1,0) + f_minus(1,0);
   flux(2,0) = f_plus(2,0) + f_minus(2,0);
   flux(3,0) = f_plus(3,0) + f_minus(3,0);
-  //print2Term(flux);
+  ///print2Term(flux);
   return flux;
 }
 
+matrix2d DG::fv_state(grid::mesh &mesh1, int i)
+{
+  std::cout<<"normal overload func"<<std::endl;
+  matrix2d U(4,1);
+  for(int k=0;k<mesh1.neqns;k++)
+    U(k,0) = mesh1.fvunkel(i,k);
+  return U;
+}
 
 
+// sub to get boundary face integral
+void DG::fv_rhsboun_bface(grid::mesh &mesh1)
+{
+  //loop through all booundary faces 
+  for(int i=0;i<mesh1.nbface;i++)
+  {
+    int &le = mesh1.bface(i,2); //get the host element
+    matrix2d Ul = DG::fv_state(mesh1,le-1);//get the host conservative varsa
+    double &nx = mesh1.boun_geoface(i,0);
+    double &ny = mesh1.boun_geoface(i,1);
+    if(mesh1.bface(i,4)==2) //this is a wall face
+    {
+      matrix2d Ur(4,1);
+      Ur(3,0) = Ul(3,0); //eneergy
+      Ur(0,0) = Ul(0,0); //density 
+      Ur(1,0) = Ul(1,0)*nx -2*(Ul(1,0)*nx + Ul(2,0)*ny)*nx;
+      Ur(2,0) = Ul(2,0)*ny -2*(Ul(1,0)*nx + Ul(2,0)*ny)*ny;
+      std::cout<<"bface ghost cell state"<<std::endl;
+      print2Term(Ur);
+      //call Reimann flux function to get interface flux
+      matrix2d flux = FVS::Van_leer(mesh1,Ul, Ur, nx, ny);                            
+      
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        mesh1.fvrhsel(le-1,m) = mesh1.fvrhsel(le-1,m)-0.5*mesh1.boun_geoface(i,6)*flux(m,0);
+      }
+    }
+    else if(mesh1.bface(i,4) ==4) //this is a far field cell
+    {
+      matrix2d Ur = mesh1.U_infty; //put the far field values for the ghost cell 
+  
+      matrix2d flux = FVS::Van_leer(mesh1, Ul, Ur, nx, ny);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        mesh1.fvrhsel(le-1,m) = mesh1.fvrhsel(le-1,m)-0.5*mesh1.boun_geoface(i,6)*flux(m,0);
+      }
+    }
+  }
+}
 
 
+void DG::fv_rhsboun_iface(grid::mesh &mesh1)
+{ 
+  //loop through all internal faces
+  for(int i=0;i<mesh1.nintface;i++)
+  {
+    int &le = mesh1.intface(i,2);
+    int &re = mesh1.intface(i,3);
+    double &nx = mesh1.int_geoface(i,0);
+    double &ny = mesh1.int_geoface(i,1);
+    matrix2d Ul = DG::fv_state(mesh1, le-1);
+    matrix2d Ur = DG::fv_state(mesh1, re-1);
+    matrix2d flux = FVS::Van_leer(mesh1,Ul,Ur,nx,ny);
+    for(int m=0;m<mesh1.neqns;m++)
+    {
+      mesh1.fvrhsel(le-1,m) = mesh1.fvrhsel(le-1,m) - 0.5*mesh1.int_geoface(i,6)*flux(m,0);
+      mesh1.fvrhsel(re-1,m) = mesh1.fvrhsel(le-1,m) + 0.5*mesh1.int_geoface(i,6)*flux(m,0);
+    }
+  }
+}
 
+
+// is the value of the elem being looped, e is the value esuel gives
+matrix2d DG::fv_state(grid::mesh &mesh1, int i, int e, double &nx, double &ny)
+{
+  //std::cout<<"overload called for esuel"<<e<<std::endl;
+  matrix2d U(4,1);
+  matrix2d host = DG::fv_state(mesh1,i);
+  if(e==-2)
+  {
+    std::cout<<"wall cell overload"<<std::endl;
+    U(0,0) = host(0,0);
+    U(3,0) = host(3,0);
+    U(1,0) = host(1,0)*nx - 2*(host(1,0)*nx + host(2,0)*ny)*nx;
+    U(2,0) = host(2,0)*ny - 2*(host(1,0)*nx + host(2,0)*ny)*ny;
+    std::cout<<"wall cell overload complete"<<std::endl;
+  }
+  else if(e==-4)
+  {
+    std::cout<<"far field overload"<<std::endl;
+    U = mesh1.U_infty;
+    std::cout<<"far field complete"<<std::endl;
+  }
+  else
+  {
+    std::cout<<"normal call"<<std::endl;
+    U = DG::fv_state(mesh1,e);
+    std::cout<<"end normal call"<<std::endl;
+  }
+  //std::cout<<"overload complete"<<std::endl;
+  return U;   
+}
+
+double ddt::calc_ts(grid::mesh &mesh1)
+{
+  double dt;
+  
+  return dt;
+}
 
 
 

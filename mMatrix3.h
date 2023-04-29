@@ -25,12 +25,24 @@ class mMatrix3
 
 		// operator overload for () to access elements
 		T &operator()(const int i,const int j,const int k);
-
-	private:
+    void test_1(mMatrix3<T> &mat); //function to test if the indexing is correct or not
+	public:
   	std::vector<T> m_vec; //actual array that stores in data 
 		int m_i ,m_j,m_k,m_n; // dimensions of 3d matrix
 		int index(int i, int j, int k); // get index for 1d array given the location of a point in the 3d array
 };
+
+template<class T>
+void mMatrix3<T>::test_1(mMatrix3<T> &mat)
+{
+  //mat.init(3, 4, 3);
+  for(int i=0;i<mat.size();i++)
+  {
+    //std::cout<<"i"<<std::endl;
+    mat.m_vec[i] = i;
+  }
+  //std::cout<<mat(1,1,1);
+}
 
 //definations
 template<class T> //default constructor

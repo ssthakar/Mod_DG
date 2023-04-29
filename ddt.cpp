@@ -1,12 +1,13 @@
 #include "dg.h"
 #include "mesh.h"
 #include "vmatrix2.h"
+#include <algorithm>
 
 // function to calculate local time step for cell i
 double ddt::local_ts(grid::mesh &mesh1, int &i)
 {
   double denom = 0.0;
-  std::cout<<"local timestep function for element called"<<std::endl;
+  std::cout<<"local timestep function for element called: "<<i<<std::endl;
 	double &area = mesh1.geoel(i,0); //area of the triangular element
 	const int &ip1 = mesh1.inpoel(i, 0); // get the points that make up the cell 
 	const int &ip2 = mesh1.inpoel(i, 1);
@@ -18,8 +19,8 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	double &p2y = mesh1.coords(ip2 - 1, 1);
 	double &p3y = mesh1.coords(ip3 - 1, 1);
 	double mag1 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));// push the components of Area weighted normal vectors to the geoface matrix
-	double mag2 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
-	double mag3 = sqrt(std::pow((p2y-p1y),2) + std::pow((p2x-p1x),2));
+	double mag2 = sqrt(std::pow((p3y-p2y),2) + std::pow((p3x-p2x),2));
+	double mag3 = sqrt(std::pow((p3y-p1y),2) + std::pow((p3x-p1x),2));
 	double nx1 = (p2y - p1y)/mag1; //unit normal vector components x and y 
 	double ny1 = -1*(p2x-p1x)/mag1;
 	double nx2 = (p3y - p2y)/mag2; //unit normal vector components x and y 
@@ -29,40 +30,43 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	double len1 = len(p1x,p2x,p1y,p2y);
 	double len2 = len(p2x,p3x,p2y,p3y);
 	double len3 = len(p1x,p3x,p1y,p3y);
-  //std::cout<<"b4 for loops"<<std::endl;
+  std::cout<<nx1*nx1 + ny1*ny1<<std::endl;
   for(int j=0;j<mesh1.ntype;j++)  //loop over all the edges of the cell 
 	{
 		switch(j)
 		{
 			case 0:
 			{
-				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
-        //std::cout<<" case 0"<<std::endl;
-        //print2Term(Ui);
-        matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j) - 1,i,nx1,ny1);
-				double ci = DG::vel_sound(Ui);
+				matrix2d Ui = DG::fv_state(mesh1,i);
+        matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j) - 1,nx1,ny1);
 			  //std::cout<<"break point 68"<<EOS::perf_gas(Uj)<<std::endl;
-				double cj = DG::vel_sound(Uj);
+        std::cout<<"left cell"<<std::endl;
+        double ci = DG::vel_sound(Ui);
+				
+        std::cout<<"left cell"<<std::endl;
+        double cj = DG::vel_sound(Uj);
         
-		 	  //std::cout<<"break point 69"<<std::endl;
         denom = denom + len1*0.5*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx1 + Uj(1,0)/Uj(0,0)*nx1 + Ui(2,0)/Ui(0,0)*ny1 + Uj(2,0)/Uj(0,0)*ny1));
 				break;
 			}
 			case 1:
 			{
-        //std::cout<<" case 1"<<std::endl;
-				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
-				matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j) - 1,i,nx2,ny2);
+  			matrix2d Ui = DG::fv_state(mesh1,i);
+        std::cout<<"left cell"<<std::endl;
+        matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j)-1,nx2,ny2);      //std::cout<<" case 1"<<std::endl;
+        std::cout<<"right cell"<<std::endl;
 				double ci = DG::vel_sound(Ui);
+		 	  //std::cout<<"break point 69"<<std::endl;
 				double cj = DG::vel_sound(Uj);
 				denom = denom + len2*0.5*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx2 + Uj(1,0)/Uj(0,0)*nx2 + Ui(2,0)/Ui(0,0)*ny2 + Uj(2,0)/Uj(0,0)*ny2));
 				break;
 			}
 			case 2:
 			{
-        //std::cout<<" case 2"<<std::endl;
-				matrix2d Ui = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
-				matrix2d Uj = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), mesh1.esuel(i,j) - 1,i,nx3,ny3);
+ 				matrix2d Ui = DG::fv_state(mesh1,i);
+        std::cout<<"left cell"<<std::endl;
+        matrix2d Uj = DG::fv_state(mesh1,i,mesh1.esuel(i,j) - 1,nx3,ny3);       //std::cout<<" case 2"<<std::endl;
+        std::cout<<"right cell"<<std::endl;
 				double ci = DG::vel_sound(Ui);
 				double cj = DG::vel_sound(Uj);
 				denom = denom + 0.5*len3*(ci+cj + std::fabs(Ui(1,0)/Ui(0,0)*nx3 + Uj(1,0)/Uj(0,0)*nx3 + Ui(2,0)/Ui(0,0)*ny3 + Uj(2,0)/Uj(0,0)*ny3));
@@ -72,7 +76,7 @@ double ddt::local_ts(grid::mesh &mesh1, int &i)
 	}
   //std::cout<<"timestep: "<<i<<" "<<const_properties::CFL*area/denom<<std::endl;
   feenableexcept(FE_INVALID | FE_OVERFLOW);
-  //std::cout<<"local timestep function complete"<<std::endl;
+  std::cout<<"local timestep function complete"<<std::endl;
 	return area/denom;
 }
 
@@ -84,12 +88,15 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 	while(iter_count<soln1.max_iter)
 	{
 		mesh1.RK_stor = mesh1.unkel; //store the current solution for further use
-		//go through all the stages of the multi-stage method, update solution at final stage 
-		ddt::RK3::RK_s1(mesh1);
-		ddt::RK3::RK_s2(mesh1);
-		ddt::RK3::RK_s3(mesh1);
-		DG::residual(mesh1); //compute the residual;
+		mesh1.fvRkstor = mesh1.fvunkel;
+    //go through all the stages of the multi-stage method, update solution at final stage 
 		
+    ddt::RK3::RK_s1(mesh1);
+    std::cout<<"timestep global is: "<<mesh1.dt<<std::endl;
+    //ddt::RK3::RK_s2(mesh1);
+		//ddt::RK3::RK_s3(mesh1);
+		DG::residual(mesh1); //compute the residual;
+		  
     std::cout<<"Residual: \n "<<mesh1.res_vec(0,0)<<"\n"<<mesh1.res_vec(1,0)<<"\n"<<mesh1.res_vec(2,0)<<"\n"<<mesh1.res_vec(3,0)<<std::endl;
 		//calculate the next time step
 	  //DG::delta_T(mesh1); //update local time steps for every element 
@@ -98,97 +105,95 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 			//break;
     std::cout<<"Iteration: "<<iter_count<<std::endl;
 		iter_count ++;
+    
 	}
+  
 }
 
 void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 {
   DG::delta_T(mesh1);
-  std::cout<<"stage 1 started"<<std::endl;
+  //std::cout<<"stage 1 started"<<std::endl;
 	//DG::delta_T(mesh1);
-  DG::rhsdomn(mesh1);
-	DG::rhsboun_bface(mesh1);
-	DG::rhsboun_iface(mesh1);
-
+  DG::fv_rhsboun_iface(mesh1);
+	DG::fv_rhsboun_bface(mesh1);
   for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
-		//double dT = 1e-5;
-    double &dT = mesh1.geoel(i,14);
+		double dT = mesh1.dt;
+    //double &dT = mesh1.geoel(i,14);
 		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
-			mesh1.unkel(i,m,0) = mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0);
+			mesh1.fvunkel(i,m) = mesh1.fvunkel(i,m) + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0);
 			//mesh1.unkel(i,m,1) = mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2);
 			//mesh1.unkel(i,m,2) = mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2);
 		}
-	  std::cout<<"shshshs "<<i<<" "<<mesh1.unkel(i,1,0)<<std::endl;
+	  //std::cout<<"shshshs "<<i<<" "<<mesh1.unkel(i,1,0)<<std::endl;
 	}
-  std::cout<<"stage 1 complete: "<<std::endl;
+  //std::cout<<"stage 1 complete: "<<std::endl;
 }
 
 
 void ddt::RK3::RK_s2(grid::mesh &mesh1)
 {
-  std::cout<<"stage 2 started"<<std::endl;
+  //std::cout<<"stage 2 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
   DG::delta_T(mesh1);
-	DG::rhsboun_bface(mesh1);
-	DG::rhsboun_iface(mesh1);
-	DG::rhsdomn(mesh1);
+	DG::fv_rhsboun_bface(mesh1);
+	DG::fv_rhsboun_iface(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
-		double &dT = mesh1.geoel(i,14);
-		//double dT = 1e-5;
+		//double &dT = mesh1.geoel(i,14);
+		double dT = mesh1.dt;
     for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
-			mesh1.unkel(i,m,0) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0));
+			mesh1.fvunkel(i,m) = 3*(mesh1.fvRkstor(i,m))/4 + 0.25*(mesh1.fvunkel(i,m) + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0));
 			//mesh1.unkel(i,m,1) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2));
 			//mesh1.unkel(i,m,2) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2));
 		}
 	}
-  std::cout<<"stage 2 complete"<<std::endl;
+  //std::cout<<"stage 2 complete"<<std::endl;
 }
 
 void ddt::RK3::RK_s3(grid::mesh &mesh1)
 {
-  std::cout<<"stage 3 started"<<std::endl;
+  //std::cout<<"stage 3 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
   DG::delta_T(mesh1);
-	DG::rhsdomn(mesh1);
-	DG::rhsboun_bface(mesh1);
-	DG::rhsboun_iface(mesh1);
+	DG::fv_rhsboun_bface(mesh1);
+	DG::fv_rhsboun_iface(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
 		double &M1 = mesh1.geoel(i,11);
 		double &M2 = mesh1.geoel(i,12);
 		double &M3 = mesh1.geoel(i,13);
-		double &dT = mesh1.geoel(i,14);
-		//double dT = 1e-5;
+		//double &dT = mesh1.geoel(i,14);
+		double dT = mesh1.dt;
     for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
-			mesh1.unkel(i,m,0) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0))/3;
-			//mesh1.unkel(i,m,1) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
+			mesh1.fvunkel(i,m) = 1*(mesh1.fvRkstor(i,m))/3 + 2*(mesh1.fvunkel(i,m) + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0))/3;
+		//	mesh1.unkel(i,m,1) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
 			//mesh1.unkel(i,m,2) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2))/3;
 		}
 	}
 
-  std::cout<<"stage 3 complete"<<std::endl;
+  //std::cout<<"stage 3 complete"<<std::endl;
 }
 
 void DG::delta_T(grid::mesh &mesh1)
 {
 	for(int i = 0;i<mesh1.nelem;i++)
 	{
-		mesh1.geoel(i,14) = ddt::local_ts(mesh1,i);
+		mesh1.Ltimestep[i] = ddt::local_ts(mesh1,i);
     //std::cout<<"element: "<<i<<std::endl;  
     feenableexcept(FE_INVALID);
   }
-  
+  mesh1.dt = *std::min_element(mesh1.Ltimestep.begin(),mesh1.Ltimestep.end());
 }
 
 void DG::residual(grid::mesh &mesh1)
@@ -198,7 +203,7 @@ void DG::residual(grid::mesh &mesh1)
 	{
 		for(int m=0;m<mesh1.neqns;m++)
 		{
-			mesh1.res_vec(m,0) = mesh1.res_vec(m,0) + sqrt(mesh1.geoel(i,0)*std::pow((std::fabs(mesh1.unkel(i,m,0) - mesh1.RK_stor(i,m,0))),2));
+			mesh1.res_vec(m,0) = mesh1.res_vec(m,0) + sqrt(mesh1.geoel(i,0)*std::pow((std::fabs(mesh1.fvunkel(i,m) - mesh1.fvRkstor(i,m))),2));
 		}
 	}
 }

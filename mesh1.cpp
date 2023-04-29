@@ -481,6 +481,12 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 		{
 			file1 << mesh1.ntype + 2 << "\n"; // VTK uses flag 5 to identify a triangle surface
 		}
+    file1<<"CELL_DATA "<<mesh1.nelem<<std::endl;
+    file1<<"SCALARS scalars float 1 \n LOOKUP_TABLE default"<<std::endl;
+    for(int i=0;i<mesh1.nelem;i++)
+    {
+      file1<<mesh1.fvunkel(i,1)/mesh1.fvunkel(i,0)<<std::endl;
+    }
 	}
 }
 // endsub
