@@ -57,8 +57,8 @@ grid::mesh::mesh(std::string s1, std::string s2)
   t_start = c[10][0];
 	U_infty.init(neqns, 1); //intial condition
 	U_infty(0,0) = c[5][0]; //reference density
-	U_infty(1,0) = cos(c[6][0]*const_properties::pi/180);//X velocity
-	U_infty(2,0) = sin(c[6][0]*const_properties::pi/180); //Y velocity
+	U_infty(1,0) = 0.0;//cos(c[6][0]*const_properties::pi/180);//X velocity
+	U_infty(2,0) = 0.0;//sin(c[6][0]*const_properties::pi/180); //Y velocity
 	double p0 = 1.0/(const_properties::gamma*c[7][0]*c[7][0]);
   U_infty(3,0) = 0.5+p0/(const_properties::gamma-1);
 	// for loop populate intpoel matrix
@@ -485,7 +485,7 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
     file1<<"SCALARS scalars float 1 \n LOOKUP_TABLE default"<<std::endl;
     for(int i=0;i<mesh1.nelem;i++)
     {
-      file1<<mesh1.fvunkel(i,1)/mesh1.fvunkel(i,0)<<std::endl;
+      file1<<mesh1.fvunkel(i,1)<<std::endl;
     }
 	}
 }
@@ -494,7 +494,7 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 // method to computes the pressure given values of properties
 double EOS::perf_gas(matrix2d &cons_var)
 {
-	double pressure = (const_properties::gamma - 1) * (cons_var(3, 0) - 0.5 / cons_var(0, 0) * (cons_var(1, 0) * cons_var(1, 0) + cons_var(2, 0) * cons_var(2, 0)));
+	double pressure = (const_properties::gamma - 1) * (cons_var(3,0) - 0.5/cons_var(0,0)*(cons_var(1,0)*cons_var(1,0) + cons_var(2,0)*cons_var(2,0)));
 	return pressure;
 }
 

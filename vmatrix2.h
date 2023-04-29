@@ -6,7 +6,7 @@
 #include <fstream>
 #include <cassert>
 #include <vector>
-const double lim_zero = 1e-15;
+//const double lim_zero = 1e-15;
 //TODO implement iterator functionality for more control over access
 template <class T>
 class vmatrix2

@@ -35,7 +35,7 @@ namespace const_properties
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 0.2; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 0.1; //CFL to use in the local time stepping for pseudo transient integration
   const double cp = gamma/(gamma-1); //dimensionless specific heat capacity
 }
 

@@ -4,8 +4,8 @@
 0.33333333333 //domain weight
 1.0 //boun weight
 1.0 //reference density
-0.0 //angle of attack
-1.1//Inlet Mach number
+1.0 //angle of attack
+0.85//Inlet Mach number
 1e-06 //Abstol
 10//Max iterations
 1e-6

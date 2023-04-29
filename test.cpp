@@ -7,7 +7,7 @@
 int main()
 {
   matrix3d L;
-  std::ofstream file("unkel.out");
+  std::ofstream file("sunkel.out");
 	auto start = std::chrono::high_resolution_clock::now();
 	grid::mesh mesh1("mesh/naca.txt","mesh/control.txt");
 	grid::construct(mesh1);
@@ -19,16 +19,20 @@ int main()
 	printMatrix(mesh1.int_geoface, "int_geoface.out");
   soln soln1(mesh1,"mesh/control.txt");
   //printMatrix(mesh1.U_infty,"initial.out");
+  printMatrix(mesh1.fvunkel,"unkel1.out");
+  //DG::fv_rhsboun_bface(mesh1);
+  //DG::fv_rhsboun_iface(mesh1);
+  //printMatrix(mesh1.fvrhsel,"rel.out");
+
   ddt::RK3::RK3_outer(mesh1,soln1);
-  for(int i=0;i<mesh1.nelem;i++)
+  printMatrix(mesh1.fvunkel,"unkel2.out");
+  printMatrix(mesh1.fvrhsel,"rel2.out");
+  /*for(int i=0;i<mesh1.nelem;i++)
   {
-     
-    for(int j=0;j<mesh1.neqns;j++)
-    {
-      file<<mesh1.fvunkel(i,j)<<std::endl;//DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i)(j,0)<<" ";
-    }
+    file<<i<<std::endl;
+    file<<mesh1.fvunkel(i,0)<<" "<<mesh1.fvunkel(i,1)<<" "<<mesh1.fvunkel(i,2)<<" "<<mesh1.fvunkel(i,3)<<std::endl;
     file<<std::endl;
-  }
+  }*/
   file<<"wall y velocity"<<std::endl;
   file<<mesh1.geoel(3,6)<<std::endl;
   //42      0.14714821E+01      0.99689457E-01

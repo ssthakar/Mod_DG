@@ -88,15 +88,11 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 	while(iter_count<soln1.max_iter)
 	{
 		mesh1.RK_stor = mesh1.unkel; //store the current solution for further use
-		mesh1.fvRkstor = mesh1.fvunkel;
-    //go through all the stages of the multi-stage method, update solution at final stage 
-		
     ddt::RK3::RK_s1(mesh1);
-    std::cout<<"timestep global is: "<<mesh1.dt<<std::endl;
+    std::cout<<"timestep global is: "<<const_properties::CFL*mesh1.dt<<std::endl;
     ddt::RK3::RK_s2(mesh1);
 		ddt::RK3::RK_s3(mesh1);
 		DG::residual(mesh1); //compute the residual;
-		  
     std::cout<<"Residual: \n "<<mesh1.res_vec(0,0)<<"\n"<<mesh1.res_vec(1,0)<<"\n"<<mesh1.res_vec(2,0)<<"\n"<<mesh1.res_vec(3,0)<<std::endl;
 		//calculate the next time step
 	  //DG::delta_T(mesh1); //update local time steps for every element 
@@ -112,6 +108,7 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 
 void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
 {
+  //mesh1.fvRkstor = mesh1.fvunkel;
   DG::delta_T(mesh1);
   //std::cout<<"stage 1 started"<<std::endl;
 	//DG::delta_T(mesh1);
@@ -126,11 +123,11 @@ void ddt::RK3::RK_s1(grid::mesh &mesh1) //this also serves forward euler
     //double &dT = mesh1.geoel(i,14);
 		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
-			mesh1.fvunkel(i,m) = mesh1.fvunkel(i,m) + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0);
+			mesh1.fvunkel(i,m) = mesh1.fvunkel(i,m)  + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0);
 			//mesh1.unkel(i,m,1) = mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2);
 			//mesh1.unkel(i,m,2) = mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2);
 		}
-	  //std::cout<<"shshshs "<<i<<" "<<mesh1.unkel(i,1,0)<<std::endl;
+		//std::cout<<mesh1.fvunkel(i,1)<<std::endl; 
 	}
   //std::cout<<"stage 1 complete: "<<std::endl;
 }
