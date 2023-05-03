@@ -17,7 +17,7 @@ namespace DG
   void fv_rhsboun_iface(grid::mesh &mesh1); //sub to compute the bounday contribution for finite volume only internal faces 
   matrix2d fv_state(grid::mesh &mesh1, int i,int e, double &nx, double &ny); //gives the finite volume state for any cell i
   void fv_rhsboun_bface(grid::mesh &mesh1); //sub to compute the boundary contribution for finitie volume only boundary faces 
-
+  void fv_fluxes(grid::mesh &mesh1);
 
   void cons(grid::mesh &mesh1); //check if scheme is conservativeh
 	void delta_T(grid::mesh &mesh1);
@@ -35,6 +35,8 @@ namespace DG
 	void rhsboun_bface(grid::mesh &mesh1); // calculate the contribution of the boundary integral from boundary faces
 	void rhsboun_iface(grid::mesh &mesh1); // calculate the contribution from boundary integral for internal faces
 	void rhsdomn(grid::mesh &mesh1);	   // calculate the contribution of the boundary integral to rhsel
+  void fluxes(grid::mesh &mesh1); // calculate the rhs before each time step
+
 };
 
 
@@ -51,9 +53,15 @@ namespace ddt // time marching methods for local cells
 	namespace RK3 //TVD Runge Kutta 3 stage 
 	{
 		void RK3_outer(grid::mesh &mesh1, soln &soln1);// outer function 
-		void RK_s1(grid::mesh &mesh1); //first stage, also forward Euler
-		void RK_s2(grid::mesh &mesh1); //second stage 
-		void RK_s3(grid::mesh &mesh1); //third stage
+    //finite vol RK stages
+		void fv_RK_s1(grid::mesh &mesh1); //first stage, also forward Euler
+		void fv_RK_s2(grid::mesh &mesh1); //second stage 
+		void fv_RK_s3(grid::mesh &mesh1); //third stage
+    //DG P1 RK stages
+    void DG_RK3_outer(grid::mesh &mesh1, soln &soln1); //outer RK loop for DG P1
+    void DG_RK_s1(grid::mesh &mesh1);
+    void DG_RK_s2(grid::mesh &mesh1);
+    void DG_RK_s3(grid::mesh &mesh1);
 	};
 };
 

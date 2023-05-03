@@ -26,7 +26,8 @@ class mMatrix3
 		// operator overload for () to access elements
 		T &operator()(const int i,const int j,const int k);
     void test_1(mMatrix3<T> &mat); //function to test if the indexing is correct or not
-	public:
+	  void reset(); //resets the entire vector to zero
+  public:
   	std::vector<T> m_vec; //actual array that stores in data 
 		int m_i ,m_j,m_k,m_n; // dimensions of 3d matrix
 		int index(int i, int j, int k); // get index for 1d array given the location of a point in the 3d array
@@ -125,5 +126,12 @@ T &mMatrix3<T>::operator()(const int i, const int j, const int k)
   int lindex = index(i,j,k);
 	return m_vec[lindex];
 }
+
+template<class T>
+void mMatrix3<T>::reset()
+{
+  std::fill(m_vec.begin(),m_vec.end(),0.0);	
+}
+
 
 #endif 

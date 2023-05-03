@@ -1,4 +1,5 @@
 /* A simple template class to store in 3d arrays in flattened format in 1d vectors*/
+	  //DG::delta_T(mesh1); //update local time steps for every element 
 #ifndef VMATRIX_H
 #define VMATRIX_H
 #include <initializer_list>

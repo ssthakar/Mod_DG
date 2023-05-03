@@ -1,5 +1,5 @@
 a.out: test.o mesh1.o dg.o mesh.h ddt.o
-	g++ -O1  mesh1.o test.o dg.o ddt.o 
+	g++   mesh1.o test.o dg.o ddt.o 
 
 test.o: mesh1.cpp mesh.h dg.cpp dg.h ddt.cpp
 	g++ -c test.cpp
@@ -14,5 +14,5 @@ ddt.o: ddt.cpp dg.h mesh1.cpp mesh.h
 	g++ -c ddt.cpp 
 
 clean:
-	rm *.o  a.out
+	rm *.o *.out 
 

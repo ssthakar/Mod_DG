@@ -57,8 +57,8 @@ grid::mesh::mesh(std::string s1, std::string s2)
   t_start = c[10][0];
 	U_infty.init(neqns, 1); //intial condition
 	U_infty(0,0) = c[5][0]; //reference density
-	U_infty(1,0) = 0.0;//cos(c[6][0]*const_properties::pi/180);//X velocity
-	U_infty(2,0) = 0.0;//sin(c[6][0]*const_properties::pi/180); //Y velocity
+	U_infty(1,0) = cos(c[6][0]*const_properties::pi/180);//X velocity
+	U_infty(2,0) = sin(c[6][0]*const_properties::pi/180); //Y velocity
 	double p0 = 1.0/(const_properties::gamma*c[7][0]*c[7][0]);
   U_infty(3,0) = 0.5+p0/(const_properties::gamma-1);
 	// for loop populate intpoel matrix
@@ -89,6 +89,7 @@ grid::mesh::mesh(std::string s1, std::string s2)
 		}
 		bface(i, 4) = v[i + nelem + 2 * npoin + 12][3];
 	}
+  testvec.resize(nelem,0.0);
 	std::cout<<"Dimension: "<<ndimn<<std::endl;
 	std::cout<<"Number of cells: "<<nelem<<std::endl;
 	std::cout<<"Number of boundary faces: "<<nbface<<std::endl;
@@ -242,7 +243,7 @@ void grid::pre_proc::set_bface(grid::mesh &mesh1)
 	{
 		for (int j = 0; j < mesh1.ntype; j++) // loop over all the faces of the element
 		{
-			int E = mesh1.esuel(i, j);
+			int &E = mesh1.esuel(i, j);
 			if (E == 0) // this is a boundary cell and has boundar face
 			{
 				mesh1.bface(bf, 3) = bf + 1 + mesh1.nelem;
@@ -446,13 +447,10 @@ void grid::pre_proc::update_esuel(grid::mesh &mesh1)
 		int &e = mesh1.bface(i,2); //get the host element for the bounddary face 
 		for(int j=0;j<mesh1.ntype;j++) //loop over all elements surrounding element 'e'
 		{
-			switch(mesh1.esuel(e-1,j))
-			{
-				case 0:
-					{
-						mesh1.esuel(e-1,j) = mesh1.bface(i,4)*-1 + 1; //push the boundary flag but with a negative value to not interfere with the actual element tags
-					}
-			}
+      if(mesh1.esuel(e-1,j)==0)
+      {
+        mesh1.esuel(e-1,j) = -mesh1.bface(i,4)+1;
+      }
 		}
 	}
 }
@@ -482,10 +480,68 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 			file1 << mesh1.ntype + 2 << "\n"; // VTK uses flag 5 to identify a triangle surface
 		}
     file1<<"CELL_DATA "<<mesh1.nelem<<std::endl;
-    file1<<"SCALARS scalars float 1 \n LOOKUP_TABLE default"<<std::endl;
+    file1<<"SCALARS rho double 1 \n LOOKUP_TABLE default"<<std::endl;
     for(int i=0;i<mesh1.nelem;i++)
     {
-      file1<<mesh1.fvunkel(i,1)<<std::endl;
+      matrix2d U(4,1);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        U(m,0) = mesh1.fvunkel(i,m);
+      }
+      double rho = U(0,0);
+      file1<<rho<<std::endl;
+    }
+    file1<<"SCALARS u double 1 \n LOOKUP_TABLE default"<<std::endl;
+    for(int i=0;i<mesh1.nelem;i++)
+    {
+      matrix2d U(4,1);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        U(m,0) = mesh1.fvunkel(i,m);
+      }
+      double rho = U(0,0);
+      double u = mesh1.fvunkel(i,1)/mesh1.fvunkel(i,0);
+
+      file1<<u<<std::endl;
+    }
+    file1<<"SCALARS v double 1 \n LOOKUP_TABLE default"<<std::endl;
+    for(int i=0;i<mesh1.nelem;i++)
+    {
+      matrix2d U(4,1);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        U(m,0) = mesh1.fvunkel(i,m);
+      }
+      double v = mesh1.fvunkel(i,2)/mesh1.fvunkel(i,0);
+      file1<<v<<std::endl;
+    }
+    file1<<"SCALARS E double 1 \n LOOKUP_TABLE default"<<std::endl;
+    for(int i=0;i<mesh1.nelem;i++)
+    {
+      matrix2d U(4,1);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        U(m,0) = mesh1.fvunkel(i,m);
+      }
+      double E = U(3,0);
+      file1<<E<<std::endl;
+    }
+    file1<<"SCALARS Mach double 1 \n LOOKUP_TABLE default"<<std::endl;
+    for(int i=0;i<mesh1.nelem;i++)
+    {
+      matrix2d U(4,1);
+      for(int m=0;m<mesh1.neqns;m++)
+      {
+        U(m,0) = mesh1.fvunkel(i,m);
+      }
+      double E = U(3,0);
+      double rho = U(0,0);
+      double u = mesh1.fvunkel(i,1)/mesh1.fvunkel(i,0);
+
+      double v = mesh1.fvunkel(i,2)/mesh1.fvunkel(i,0);
+      double vt = sqrt(u*u + v*v);
+      double Mach = vt/DG::vel_sound(U);
+      file1<<Mach<<std::endl;
     }
 	}
 }
@@ -494,8 +550,9 @@ void grid::post_proc::writevtk_mesh(grid::mesh &mesh1, std::string file_name)
 // method to computes the pressure given values of properties
 double EOS::perf_gas(matrix2d &cons_var)
 {
+  double eps1 = const_properties::eps;
 	double pressure = (const_properties::gamma - 1) * (cons_var(3,0) - 0.5/cons_var(0,0)*(cons_var(1,0)*cons_var(1,0) + cons_var(2,0)*cons_var(2,0)));
-	return pressure;
+	return std::max(eps1,pressure);
 }
 
 // this method computes the jacobian for a triangular element

@@ -35,7 +35,7 @@ namespace const_properties
 	const double pi = 3.141592653589793238463; //for degrees to radians for angle of attack
 	const double gamma = 1.4;
 	const double lim_zero = 1e-15;
-	const double CFL = 0.1; //CFL to use in the local time stepping for pseudo transient integration
+	const double CFL = 0.4; //CFL to use in the local time stepping for pseudo transient integration
   const double cp = gamma/(gamma-1); //dimensionless specific heat capacity
 }
 
@@ -72,11 +72,12 @@ namespace grid
 			double domweight; //weights for domain gauss quadrature
       double bounweight; //weigths for boundary domain quadrature
       std::vector<double> Ltimestep;
+      double cons;
       double dt;
       //control format ndegr|ngauss_boun|ngauss_domn
 			matrix2d control; //matrix to store in data from control file
-
-			//mesh data structures
+       std::vector<double> testvec;
+	  		//mesh data structures
 			matrix2i inpoel; // connectivity matrix for mesh 
 			matrix2d coords;// coords matrix 
 			matrix2i bface; //matrix to store in boundary face and the flags needed to identify a face as inlet,outlet or wall
@@ -93,6 +94,7 @@ namespace grid
 			matrix2d fvunkel; //solution storage for finite volume
       matrix2d fvrhsel;
       matrix2d fvRkstor; //storage for calculating the residual
+      
       matrix3d unkel; //3d array that stores in the solution unknowns. for each variable //init with void init function 
 			matrix3d rhsel; //3d array to store rhs for each element  // init with void init function 
 			matrix3d RK_stor; //storage for multi-stage RHS to store the current solution 
