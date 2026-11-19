@@ -79,8 +79,8 @@ void ddt::RK3::RK3_outer(grid::mesh &mesh1,soln &soln1)
 		DG::residual(mesh1); //compute the residual;
     std::cout<<"Cons: "<<mesh1.cons<<std::endl;
     std::cout<<"Residual: \n "<<mesh1.res_vec(0,0)<<"\n"<<mesh1.res_vec(1,0)<<"\n"<<mesh1.res_vec(2,0)<<"\n"<<mesh1.res_vec(3,0)<<std::endl;
-		//if(DG::isSolnConverged(mesh1,soln1) == 1)
-			//break;
+		if(DG::isSolnConverged(mesh1,soln1))
+			break;
     std::cout<<"Iteration: "<<iter_count+1<<std::endl;
 		iter_count ++;
     
@@ -123,7 +123,7 @@ void ddt::RK3::fv_RK_s1(grid::mesh &mesh1) //this also serves forward euler
     double &dT = mesh1.geoel(i,14);
 		for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
-			mesh1.fvunkel(i,m) = mesh1.fvunkel(i,m)  + mesh1.dt*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0);
+			mesh1.fvunkel(i,m) = mesh1.fvunkel(i,m)  + dT*mesh1.fvrhsel(i,m)/mesh1.geoel(i,0);
 		}
 	}
 }
@@ -132,7 +132,7 @@ void ddt::RK3::fv_RK_s1(grid::mesh &mesh1) //this also serves forward euler
 void ddt::RK3::fv_RK_s2(grid::mesh &mesh1)
 {
 	//update RHS to get the contribution of the latest solution state 
-  DG::delta_T(mesh1);
+  //time step is frozen over the RK step (computed in stage 1)
   DG::fv_fluxes(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
@@ -149,7 +149,7 @@ void ddt::RK3::fv_RK_s3(grid::mesh &mesh1)
 {
   //std::cout<<"stage 3 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
-  DG::delta_T(mesh1);
+  //time step is frozen over the RK step (computed in stage 1)
   DG::fv_fluxes(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
@@ -187,7 +187,7 @@ void ddt::RK3::DG_RK_s1(grid::mesh &mesh1)
 void ddt::RK3::DG_RK_s2(grid::mesh &mesh1)
 {
 	//update RHS to get the contribution of the latest solution state 
-  DG::delta_T(mesh1);
+  //time step is frozen over the RK step (computed in stage 1)
   DG::fluxes(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
@@ -198,8 +198,8 @@ void ddt::RK3::DG_RK_s2(grid::mesh &mesh1)
     for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
 			mesh1.unkel(i,m,0) = 3.0*(mesh1.RK_stor(i,m,0))/4.0 + 0.25*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0)/mesh1.geoel(i,0));
-			mesh1.unkel(i,m,1) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2));
-			mesh1.unkel(i,m,2) = 3*(mesh1.RK_stor(i,m,0))/4 + 0.25*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2));
+			mesh1.unkel(i,m,1) = 3.0*(mesh1.RK_stor(i,m,1))/4.0 + 0.25*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2));
+			mesh1.unkel(i,m,2) = 3.0*(mesh1.RK_stor(i,m,2))/4.0 + 0.25*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2));
 		}
 	}
 }
@@ -208,7 +208,7 @@ void ddt::RK3::DG_RK_s3(grid::mesh &mesh1)
 {
   //std::cout<<"stage 3 started"<<std::endl;
 	//update RHS to get the contribution of the latest solution state 
-  DG::delta_T(mesh1);
+  //time step is frozen over the RK step (computed in stage 1)
   DG::fluxes(mesh1);
 	for(int i = 0;i<mesh1.nelem;i++) //loop through all elements
 	{
@@ -219,8 +219,8 @@ void ddt::RK3::DG_RK_s3(grid::mesh &mesh1)
     for(int m=0;m<mesh1.neqns;m++) //loop through all conservative variables
 		{
 			mesh1.unkel(i,m,0) = 1.0*(mesh1.RK_stor(i,m,0))/3.0 + 2*(mesh1.unkel(i,m,0) + dT*mesh1.rhsel(i,m,0)/mesh1.geoel(i,0))/3;
-		  mesh1.unkel(i,m,1) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
-			mesh1.unkel(i,m,2) = 1*(mesh1.RK_stor(i,m,0))/3 + 2*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2))/3;
+		  mesh1.unkel(i,m,1) = 1.0*(mesh1.RK_stor(i,m,1))/3.0 + 2*(mesh1.unkel(i,m,1) + dT*(M3*mesh1.rhsel(i,m,1) - M2*mesh1.rhsel(i,m,2))/(M1*M3 - M2*M2))/3;
+			mesh1.unkel(i,m,2) = 1.0*(mesh1.RK_stor(i,m,2))/3.0 + 2*(mesh1.unkel(i,m,2) + dT*(M1*mesh1.rhsel(i,m,2) - M2*mesh1.rhsel(i,m,1))/(M1*M3 - M2*M2))/3;
 		}
 	}
   //std::cout<<"stage 3 complete"<<std::endl;
@@ -252,13 +252,12 @@ void DG::residual(grid::mesh &mesh1)
 
 bool DG::isSolnConverged(grid::mesh &mesh1, soln &soln1)
 {
-	bool result = false;
 	for(int i=0;i<mesh1.neqns;i++)
 	{
-		if(mesh1.res_vec(i,0)<soln1.abstol)
-			result = true;
+		if(mesh1.res_vec(i,0)>=soln1.abstol)
+			return false; //every equation must be converged
 	}
-	return result;
+	return true;
 }
 
 

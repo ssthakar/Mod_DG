@@ -126,11 +126,10 @@ void DG::rhsdomn(grid::mesh &mesh1) // pass reference to the mesh object
     for (int j = 0; j < mesh1.ngauss_domn; j++) // loop over all gauss points
     {
       matrix2d U = DG::U_at_poin(mesh1, mesh1.geoel(i, 2*j+5), mesh1.geoel(i, 2*j+6), i);
-      matrix2d shit = Fx(U);
       for(int l=0;l<mesh1.neqns;l++)
       {
-        mesh1.rhsel(i, l, 1) = mesh1.rhsel(i, l, 1) - mesh1.geoel(i,0)*mesh1.domweight*DG::Fx(U)(l,0)*mesh1.geoel(i,1)/mesh1.geoel(i,3); //DG::Fx and DG::Fy are functions that return the x and y flux vector 
-        mesh1.rhsel(i, l, 2) = mesh1.rhsel(i, l, 2) - mesh1.geoel(i,0)*mesh1.domweight*DG::Fy(U)(l,0)*mesh1.geoel(i,2)/mesh1.geoel(i,4);
+        mesh1.rhsel(i, l, 1) = mesh1.rhsel(i, l, 1) + mesh1.geoel(i,0)*mesh1.domweight*DG::Fx(U)(l,0)/mesh1.geoel(i,3); //DG::Fx and DG::Fy are functions that return the x and y flux vector 
+        mesh1.rhsel(i, l, 2) = mesh1.rhsel(i, l, 2) + mesh1.geoel(i,0)*mesh1.domweight*DG::Fy(U)(l,0)/mesh1.geoel(i,4);
       }
     }
   }
@@ -165,8 +164,8 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
         for(int k=0;k<mesh1.neqns;k++)
         {
           mesh1.rhsel(le-1, k, 0)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,k, 0);
-          mesh1.rhsel(le-1, k, 1)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,k,1);
-          mesh1.rhsel(le-1, k, 2)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,k,2);
+          mesh1.rhsel(le-1, k, 1)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.boun_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,k,1);
+          mesh1.rhsel(le-1, k, 2)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.boun_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,k,2);
         }
       }
     }
@@ -182,8 +181,8 @@ void DG::rhsboun_bface(grid::mesh &mesh1)
         for(int k =0;k<mesh1.neqns;k++)
         {
           mesh1.rhsel(le-1, k, 0)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6) + mesh1.rhsel(le-1,k, 0);
-          mesh1.rhsel(le-1, k, 1)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,k,1);
-          mesh1.rhsel(le-1, k, 2)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.int_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,k,2);
+          mesh1.rhsel(le-1, k, 1)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.boun_geoface(i,2*j+2)- mesh1.geoel(le-1,1))/mesh1.geoel(le-1,3) + mesh1.rhsel(le-1,k,1);
+          mesh1.rhsel(le-1, k, 2)  = -0.5*flux(k,0)*mesh1.bounweight*mesh1.boun_geoface(i,6)*(mesh1.boun_geoface(i,2*j+3)- mesh1.geoel(le-1,2))/mesh1.geoel(le-1,4) + mesh1.rhsel(le-1,k,2);
         }
       }
     }
@@ -240,7 +239,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
   {
     //std::cout<<"floatingpoint undef host"<<ci2<<std::endl;
   }
-  double cj2 = gam*EOS::perf_gas(Ul)/Ul(0,0);
+  double cj2 = gam*EOS::perf_gas(Ur)/Ur(0,0);
   if(cj2<0)
   {
     //std::cout<<"floatingpoint undef right or ghost "<<cj2<<std::endl;
@@ -292,14 +291,14 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
     f_plus(0,0) = 0.25*rhoi*ci*std::pow((Mni+1),2);
     f_plus(1,0) = f_plus(0,0)*(vxi + nx*(-vni+2*ci)/gam);
     f_plus(2,0) = f_plus(0,0)*(vyi + ny*(-vni+2*ci)/gam);
-    f_plus(3,0) = f_plus(0,0)*(0.5*(vti*vti - vni*vni) + pow(((gam-1)*vni+2*ci),2)/(2*gam*gam-1));
+    f_plus(3,0) = f_plus(0,0)*(0.5*(vti*vti - vni*vni) + pow(((gam-1)*vni+2*ci),2)/(2*(gam*gam-1)));
   }
   // compute negative fluxes for right cell j
   if(Mnj>1)
   {
      for(int m=0;m<mesh1.neqns;m++)
     {
-      f_minus(0,0)=0.0;
+      f_minus(m,0)=0.0;
     }//make all elements zero
     //f_minus.reset();
   }
@@ -317,7 +316,7 @@ matrix2d FVS::Van_leer(grid::mesh &mesh1, matrix2d &Ul, matrix2d &Ur, double &nx
     f_minus(0,0) = -0.25*rhoj*cj*pow((Mnj-1),2);
     f_minus(1,0) = f_minus(0,0)*(vxj + nx*(-vnj - 2*cj)/gam);
     f_minus(2,0) = f_minus(0,0)*(vyj + ny*(-vnj - 2*cj)/gam);
-    f_minus(3,0) = f_minus(0,0)*(0.5*(vtj*vtj - vnj*vnj) + pow(((gam - 1)*vnj - 2*cj),2)/(2*gam*gam - 1));
+    f_minus(3,0) = f_minus(0,0)*(0.5*(vtj*vtj - vnj*vnj) + pow(((gam - 1)*vnj - 2*cj),2)/(2*(gam*gam - 1)));
   }
   for(int m=0;m<mesh1.neqns;m++)
   {

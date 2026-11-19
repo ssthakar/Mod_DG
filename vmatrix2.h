@@ -39,7 +39,7 @@ vmatrix2<T>::vmatrix2()
   m_rows = 1;
   m_cols = 1;
   m_n = 1;
-  std::vector<T> m_vec(1);
+  m_vec.resize(1, 0.0);
 }
 
 // static initialization using constructor
@@ -55,6 +55,9 @@ vmatrix2<T>::vmatrix2(const int nrows, const int ncols)
 template<class T>
 vmatrix2<T>::vmatrix2(const vmatrix2<T> &vector)
 {
+  m_rows = vector.m_rows;
+  m_cols = vector.m_cols;
+  m_n = vector.m_n;
 	m_vec = vector.m_vec;
 }
 
