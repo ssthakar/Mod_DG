@@ -445,9 +445,16 @@ void grid::pre_proc::update_esuel(grid::mesh &mesh1)
 	for(int i =0;i<mesh1.nbface;i++) //loop through all boundary faces 
 	{
 		int &e = mesh1.bface(i,2); //get the host element for the bounddary face 
-		for(int j=0;j<mesh1.ntype;j++) //loop over all elements surrounding element 'e'
+		int &p1 = mesh1.bface(i,0);
+		int &p2 = mesh1.bface(i,1);
+		for(int j=0;j<mesh1.ntype;j++) //loop over all faces of element 'e'
 		{
-      if(mesh1.esuel(e-1,j)==0)
+      // face j of an element joins local points j and j+1; only flag the face that matches this boundary face
+      // (a corner cell can have two boundary faces with different flags, e.g. wall and far field)
+      int a = mesh1.inpoel(e-1,j);
+      int b = mesh1.inpoel(e-1,(j+1)%mesh1.ntype);
+      bool match = (a==p1 and b==p2) or (a==p2 and b==p1);
+      if(match and mesh1.esuel(e-1,j)==0)
       {
         mesh1.esuel(e-1,j) = -mesh1.bface(i,4)+1;
       }
