@@ -1,0 +1,453 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=false,linkbordercolor={1 0 0}]{hyperref}
+\usepackage{enumitem}
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+% code box: \codebox{code}{file, function}
+\definecolor{codebg}{gray}{0.94}
+\newcommand{\codebox}[2]{%
+  \par\smallskip\noindent\fcolorbox{gray}{codebg}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}
+  \footnotesize\ttfamily #1\hfill\textrm{\footnotesize\texttt{#2}}\end{minipage}}\par\smallskip}
+
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\U}{\mathbf{U}}
+\newcommand{\R}{\mathbf{R}}
+\newcommand{\M}{\mathbf{M}}
+\newcommand{\Hf}{\mathcal{H}}
+\newcommand{\W}{\mathcal{W}}
+
+\title{\textbf{Compressible Euler Equations:\\ A Modal Discontinuous Galerkin Discretisation on Triangles,\\ its Finite-Volume Limit, and TVD Runge--Kutta Marching}\\[0.5em]
+\normalsize From strong form to the element residual; the scaled Taylor basis and its closed-form mass matrix; Van Leer flux-vector splitting at element faces; ghost-state boundary conditions; local time stepping}
+\author{Mod\_DG}
+\date{}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%==========================================================================
+\section{Preliminaries and Notation}
+
+Let $\Omega\subset\mathbb{R}^d$ ($d=2$) be an open, bounded polygonal domain with boundary $\partial\Omega$ partitioned as
+\[
+\partial\Omega=\Gamma_W\cup\Gamma_\infty,\qquad \Gamma_W\cap\Gamma_\infty=\emptyset,
+\]
+into solid walls $\Gamma_W$ and far-field boundaries $\Gamma_\infty$. The outward unit normal on $\partial\Omega$ is $n_j$. The (pseudo-)time interval is $(0,T]$.
+
+\paragraph{Index notation.} Standard tensor notation is adopted. Repeated Latin indices in the subscript imply summation over $\{1,\dots,d\}$; spatial derivatives are written $u_{i,j}=\partial u_i/\partial x_j$. Greek indices $\alpha,\beta\in\{1,\dots,4\}$ label the components of the vector of conservative variables and are \emph{not} summed unless a sum is written. Latin indices $a,b$ label the local modes (basis functions) of an element, $q$ labels quadrature points, $e$ elements and $f$ faces. Superscripts denote time levels ($n$) or Runge--Kutta stages ($(s)$).
+
+\paragraph{Mesh counts.} We denote by $n_{\mathrm{el}}$ the number of triangles, $n_{\mathrm{p}}$ the number of mesh points, $n_{\mathrm{f}}$ the number of internal faces and $n_{\mathrm{bf}}$ the number of boundary faces. Each element carries $n_{\mathrm{en}}=\tfrac12(p+1)(p+2)$ local degrees of freedom per conservative variable, where $p$ is the polynomial degree; for the DG(P1) scheme $n_{\mathrm{en}}=3$, for the finite-volume limit DG(P0) $n_{\mathrm{en}}=1$. Unlike the nodal elements of a continuous Galerkin method these are \emph{modes}, not nodes: no degree of freedom is shared between elements.
+
+\paragraph{Global discrete fields.} Bold capitals denote global arrays: $\U\in\mathbb{R}^{n_{\mathrm{el}}\times 4\times n_{\mathrm{en}}}$ holds the modal coefficients $U^e_{\alpha a}$, and $\R$ (same shape) the assembled right-hand side.
+
+\codebox{matrix3d unkel(nelem, neqns, ndegr);\quad matrix3d rhsel(nelem, neqns, ndegr);}{mesh.h, grid::mesh}
+
+%==========================================================================
+\section{Strong Form}
+
+Find the conservative state $U_\alpha:\Omega\times(0,T]\to\mathbb{R}$, $\alpha=1,\dots,4$, such that
+\begin{equation}\label{eq:euler}
+\frac{\partial U_\alpha}{\partial t}+\frac{\partial F_{\alpha j}}{\partial x_j}=0\qquad\text{in }\Omega\times(0,T],
+\end{equation}
+with state and inviscid flux
+\begin{equation}\label{eq:flux}
+U_\alpha=\begin{pmatrix}\rho\\ \rho u_1\\ \rho u_2\\ \rho E\end{pmatrix},\qquad
+F_{\alpha j}=\begin{pmatrix}\rho u_j\\ \rho u_1u_j+p\,\delta_{1j}\\ \rho u_2u_j+p\,\delta_{2j}\\ u_j(\rho E+p)\end{pmatrix}.
+\end{equation}
+
+\paragraph{Equation of state (calorically perfect gas).}
+\begin{equation}\label{eq:eos}
+p=(\gamma-1)\Big[\rho E-\tfrac12\rho\,u_ku_k\Big],\qquad c=\sqrt{\gamma p/\rho},\qquad\gamma=1.4.
+\end{equation}
+In the code the pressure is floored, $p\leftarrow\max(p,\epsilon)$ with $\epsilon=10^{-6}$, so that $c$ is always real.
+
+\codebox{pressure = (gamma-1)*(U(3)-0.5/U(0)*(U(1)*U(1)+U(2)*U(2))); return max(eps,pressure);}{mesh1.cpp, EOS::perf\_gas}
+
+\paragraph{Non-dimensionalisation and free stream.} Density and speed are scaled by their free-stream values, $\rho_\infty=1$, $|u_\infty|=1$. For a free-stream Mach number $M_\infty$ and angle of attack $\theta$,
+\begin{equation}\label{eq:uinf}
+\rho_\infty=1,\qquad u_{\infty,i}=(\cos\theta,\ \sin\theta),\qquad p_\infty=\frac{1}{\gamma M_\infty^2},\qquad \rho E_\infty=\frac12+\frac{p_\infty}{\gamma-1},
+\end{equation}
+so that $c_\infty=1/M_\infty$.
+
+\codebox{U\_infty(3,0) = 0.5 + p0/(gamma-1);\quad p0 = 1/(gamma*Mach*Mach);}{mesh1.cpp, grid::mesh::mesh}
+
+\paragraph{Boundary and initial conditions.}
+\begin{subequations}\label{eq:bc}
+\begin{align}
+u_jn_j&=0 &&\text{on }\Gamma_W\times(0,T], \label{eq:bcwall}\\
+U_\alpha&\to U_{\infty,\alpha}\ \text{(along incoming characteristics)} &&\text{on }\Gamma_\infty\times(0,T],\label{eq:bcinf}\\
+U_\alpha&=U_{\infty,\alpha} &&\text{in }\Omega\text{ at }t=0.\label{eq:ic}
+\end{align}
+\end{subequations}
+Neither condition is imposed strongly. Both enter only through the ghost state of the face flux (Section~\ref{sec:bc}), which is how a DG method imposes all boundary data.
+
+%==========================================================================
+\section{Broken Spaces and Weak Form}
+
+\subsection{The broken space}
+The domain is partitioned into straight-sided triangles, $\Omega=\bigcup_{e=1}^{n_{\mathrm{el}}}\Omega_e$. The discrete space is \emph{broken}: polynomial on each element, with no continuity across faces,
+\[
+\mathcal{V}_h^p=\big\{v\in L^2(\Omega):\ v|_{\Omega_e}\in\mathbb{P}_p(\Omega_e)\ \ \forall e\big\}.
+\]
+Both trial and weighting functions are taken from $\mathcal{V}_h^p$. Because a weighting function can be supported on a single element, the weak form holds element by element.
+
+\subsection{Weak form on one element}
+\paragraph{Step 1: weight and integrate.} Multiply \eqref{eq:euler} by $v\in\mathcal{V}_h^p$ and integrate over $\Omega_e$:
+\begin{equation}\label{eq:w1}
+\int_{\Omega_e}\frac{\partial U_\alpha}{\partial t}\,v\dd\Omega+\int_{\Omega_e}\frac{\partial F_{\alpha j}}{\partial x_j}\,v\dd\Omega=0.
+\end{equation}
+
+\paragraph{Step 2: integrate the flux divergence by parts.} By the product rule and the divergence theorem,
+\begin{equation}\label{eq:w2}
+\int_{\Omega_e}\frac{\partial F_{\alpha j}}{\partial x_j}\,v\dd\Omega=\int_{\partial\Omega_e}F_{\alpha j}\,n_j\,v\dd\Gamma-\int_{\Omega_e}F_{\alpha j}\,\frac{\partial v}{\partial x_j}\dd\Omega,
+\end{equation}
+where $n_j$ is now the outward normal of $\partial\Omega_e$.
+
+\paragraph{Step 3: replace the trace flux by a numerical flux.} On $\partial\Omega_e$ the discrete state is double-valued: $U^-_\alpha$ from inside $\Omega_e$ and $U^+_\alpha$ from the neighbour (or a ghost state on $\partial\Omega$). The normal flux $F_{\alpha j}n_j$ is replaced by a single-valued, consistent and conservative numerical flux
+\begin{equation}\label{eq:numflux}
+F_{\alpha j}n_j\ \longrightarrow\ \Hf_\alpha\big(U^-,U^+;n\big),\qquad
+\begin{aligned}
+&\Hf_\alpha(U,U;n)=F_{\alpha j}(U)\,n_j &&\text{(consistent)},\\
+&\Hf_\alpha(U^-,U^+;n)=-\Hf_\alpha(U^+,U^-;-n) &&\text{(conservative)}.
+\end{aligned}
+\end{equation}
+This is the only coupling between elements.
+
+\paragraph{The complete weak form.} Collecting Steps 1--3: find $U_\alpha\in\mathcal{V}_h^p$ such that for every element and all $v\in\mathbb{P}_p(\Omega_e)$,
+\begin{equation}\label{eq:weak}
+\boxed{\ \int_{\Omega_e}\frac{\partial U_\alpha}{\partial t}\,v\dd\Omega=\underbrace{\int_{\Omega_e}F_{\alpha j}(U)\,\frac{\partial v}{\partial x_j}\dd\Omega}_{\text{volume term}}-\underbrace{\int_{\partial\Omega_e}\Hf_\alpha(U^-,U^+;n)\,v\dd\Gamma}_{\text{face term}}\ }
+\end{equation}
+
+Two features of \eqref{eq:weak} matter for everything that follows.
+\begin{itemize}
+\item The mass term couples modes of the \emph{same} element only, so the mass matrix is block diagonal with $n_{\mathrm{en}}\times n_{\mathrm{en}}$ blocks and is inverted element by element. There is no global linear solve.
+\item For $v=1$ the volume term vanishes and \eqref{eq:weak} is a finite-volume balance for the cell mean. With $p=0$ this is \emph{all} that remains (Section~\ref{sec:fv}).
+\end{itemize}
+
+%==========================================================================
+\section{The Scaled Taylor Basis}
+
+\subsection{Shape-function expansion}
+On each element the state is expanded in a modal basis $N_a$ centred on the element centroid $x_{c,i}$ and scaled by the half-extents of the element:
+\begin{equation}\label{eq:basis}
+\boxed{\ N_1=1,\qquad N_2(x)=\frac{x_1-x_{c,1}}{\Delta x_1},\qquad N_3(x)=\frac{x_2-x_{c,2}}{\Delta x_2}\ }
+\end{equation}
+with
+\begin{equation}\label{eq:geo}
+x_{c,i}=\frac13\sum_{A=1}^{3}x_{Ai},\qquad \Delta x_i=\frac12\Big(\max_A x_{Ai}-\min_A x_{Ai}\Big),
+\end{equation}
+where $x_{Ai}$, $A=1,2,3$, are the element vertices. The expansion is
+\begin{equation}\label{eq:expansion}
+U_\alpha(x,t)\big|_{\Omega_e}=\sum_{b=1}^{n_{\mathrm{en}}}N_b(x)\,U^e_{\alpha b}(t),\qquad v(x)\big|_{\Omega_e}=\sum_{a=1}^{n_{\mathrm{en}}}N_a(x)\,V^e_a .
+\end{equation}
+Because $N_2,N_3$ are linear with zero mean over the element (the centroid is the first moment), $U^e_{\alpha1}$ is \emph{exactly} the cell average, $U^e_{\alpha2},U^e_{\alpha3}$ are scaled gradients, and the P0 scheme is recovered by truncating to $a=1$. The scaling by $\Delta x_i$ makes all three modes $\mathcal{O}(1)$ on the element and keeps the mass matrix well conditioned on stretched cells.
+
+\codebox{state(k) = unkel(i,k,0) + unkel(i,k,1)*(gx-xc)/dx + unkel(i,k,2)*(gy-yc)/dy;}{dg.cpp, DG::U\_at\_poin}
+
+\subsection{Physical derivatives of the basis}
+The basis is defined directly in physical coordinates, so no reference map or Jacobian inverse is needed for the derivatives. They are constant on the element:
+\begin{equation}\label{eq:dN}
+\frac{\partial N_1}{\partial x_j}=0,\qquad \frac{\partial N_2}{\partial x_j}=\frac{\delta_{1j}}{\Delta x_1},\qquad \frac{\partial N_3}{\partial x_j}=\frac{\delta_{2j}}{\Delta x_2}.
+\end{equation}
+
+\begin{remark}[Physical vs.\ reference basis]
+Defining the modes on the physical element rather than on $\hat\Omega$ costs nothing on straight-sided triangles: the map is affine, $|\det\mathbf{J}|=2|\Omega_e|$ is constant, and the only thing the reference element would supply is the area, which is computed directly. The price is that the mass matrix is not the same on every element and must be stored per element (Section~\ref{sec:mass}).
+\end{remark}
+
+%==========================================================================
+\section{Element Geometry and Quadrature}
+
+\subsection{Volume rule}
+Element integrals use the three-point edge-midpoint rule on the triangle,
+\begin{equation}\label{eq:volq}
+\boxed{\ \int_{\Omega_e}g\dd\Omega\approx\sum_{q=1}^{3}g(x_q)\,\W_{eq},\qquad \W_{eq}=\frac{|\Omega_e|}{3},\qquad x_q\in\Big\{\tfrac{x_1+x_2}{2},\tfrac{x_2+x_3}{2},\tfrac{x_3+x_1}{2}\Big\}\ }
+\end{equation}
+which is exact for polynomials of degree $\le 2$. The area is
+\[
+|\Omega_e|=\tfrac12\big|x_{11}(x_{22}-x_{32})+x_{21}(x_{32}-x_{12})+x_{31}(x_{12}-x_{22})\big|.
+\]
+
+\subsection{Face rule}
+On a face $f$ from vertex $x^{(1)}$ to $x^{(2)}$, of length $|\Gamma_f|$, the two-point Gauss--Legendre rule is used:
+\begin{equation}\label{eq:faceq}
+\boxed{\ \int_{\Gamma_f}g\dd\Gamma\approx\sum_{q=1}^{2}g(x_q)\,\frac{|\Gamma_f|}{2}\,w_q\ },\qquad x_q=x^{(1)}+\tfrac12(1+\xi_q)\big(x^{(2)}-x^{(1)}\big),\quad \xi_q=\mp\tfrac{1}{\sqrt3},\quad w_q=1,
+\end{equation}
+exact for degree $\le 3$ along the face. The face normal is the right-hand normal of the directed edge,
+\begin{equation}\label{eq:normal}
+n_f=\frac{1}{|\Gamma_f|}\big(x^{(2)}_2-x^{(1)}_2,\ -(x^{(2)}_1-x^{(1)}_1)\big).
+\end{equation}
+Elements are stored counter-clockwise, so $n_f$ points \emph{out of} the element on the left of the edge, $e^-$, and into the element on its right, $e^+$.
+
+\subsection{The stored arrays}
+Everything downstream is built from the following per-mesh tensors. They are computed once, in \texttt{grid::construct}; code indices are 0-based.
+
+\begin{center}
+\small
+\begin{tabular}{llll}
+\toprule
+Symbol & Shape & Code name & Meaning\\
+\midrule
+$|\Omega_e|$ & $(n_{\mathrm{el}})$ & \texttt{geoel(e,0)} & element area\\
+$x_{c,i}$ & $(n_{\mathrm{el}},2)$ & \texttt{geoel(e,1:2)} & centroid\\
+$\Delta x_i$ & $(n_{\mathrm{el}},2)$ & \texttt{geoel(e,3:4)} & basis scaling \eqref{eq:geo}\\
+$x_{qi}$ & $(n_{\mathrm{el}},3,2)$ & \texttt{geoel(e,5:10)} & volume quadrature points\\
+$M^e_{22},M^e_{23},M^e_{33}$ & $(n_{\mathrm{el}},3)$ & \texttt{geoel(e,11:13)} & mass-matrix entries \eqref{eq:mass}\\
+$\Delta t_e$ & $(n_{\mathrm{el}})$ & \texttt{geoel(e,14)} & local time step \eqref{eq:dt}\\
+$n_{f,i}$ & $(n_{\mathrm{f}},2)$ & \texttt{int\_geoface(f,0:1)} & unit normal \eqref{eq:normal}\\
+$x_{qi}$ & $(n_{\mathrm{f}},2,2)$ & \texttt{int\_geoface(f,2:5)} & face Gauss points\\
+$|\Gamma_f|$ & $(n_{\mathrm{f}})$ & \texttt{int\_geoface(f,6)} & face length\\
+$(e^-,e^+)$ & $(n_{\mathrm{f}},2)$ & \texttt{intface(f,2:3)} & left/right element (1-based)\\
+-- & $(n_{\mathrm{bf}},7)$ & \texttt{boun\_geoface} & as \texttt{int\_geoface}, boundary faces\\
+(host, flag) & $(n_{\mathrm{bf}},2)$ & \texttt{bface(f,2|4)} & host element; flag 2 wall, 4 far field\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%==========================================================================
+\section{Elemental Matrix Definitions}
+
+Each term of \eqref{eq:weak} is obtained by inserting \eqref{eq:expansion}, factoring out the coefficients $V^e_a$, and using the fact that they are arbitrary. This gives the semi-discrete system
+\begin{equation}\label{eq:semi}
+\boxed{\ \sum_{b=1}^{n_{\mathrm{en}}}M^e_{ab}\,\frac{\dd U^e_{\alpha b}}{\dd t}=R^e_{\alpha a}=R^{e,\Omega}_{\alpha a}-R^{e,\Gamma}_{\alpha a},\qquad a=1,\dots,n_{\mathrm{en}},\quad\alpha=1,\dots,4\ }
+\end{equation}
+Every derivation below follows the same stages: (i) origin, (ii) substitution, (iii) quadrature, (iv) code.
+
+\subsection{Mass matrix}\label{sec:mass}
+\textbf{(i) Origin.} The transient term of \eqref{eq:weak}, $\int_{\Omega_e}\partial_tU_\alpha\,v\dd\Omega$.
+
+\textbf{(ii) Substitution.} Inserting \eqref{eq:expansion},
+\[
+\int_{\Omega_e}\partial_tU_\alpha\,v\dd\Omega=\sum_{a,b}V^e_a\underbrace{\Big(\int_{\Omega_e}N_aN_b\dd\Omega\Big)}_{M^e_{ab}}\dot U^e_{\alpha b}.
+\]
+$\alpha$ never enters $M^e_{ab}$: the same scalar block acts on all four conservative variables.
+
+\begin{definition}[Element mass matrix]
+\begin{equation}\label{eq:massdef}
+\boxed{\ M^e_{ab}=\int_{\Omega_e}N_aN_b\dd\Omega\ }\qquad \M^e\in\mathbb{R}^{n_{\mathrm{en}}\times n_{\mathrm{en}}}.
+\end{equation}
+\end{definition}
+
+\textbf{(iii) Closed form.} Since $\int_{\Omega_e}(x_i-x_{c,i})\dd\Omega=0$, the first row and column decouple, and $\M^e$ is
+\begin{equation}\label{eq:mass}
+\M^e=\begin{pmatrix}|\Omega_e|&0&0\\0&M^e_{22}&M^e_{23}\\0&M^e_{23}&M^e_{33}\end{pmatrix},\qquad
+M^e_{22}=\frac{I^e_{11}}{\Delta x_1^2},\quad M^e_{23}=\frac{I^e_{12}}{\Delta x_1\Delta x_2},\quad M^e_{33}=\frac{I^e_{22}}{\Delta x_2^2},
+\end{equation}
+with the central second moments of the triangle
+\begin{equation}\label{eq:moments}
+I^e_{ij}=\int_{\Omega_e}(x_i-x_{c,i})(x_j-x_{c,j})\dd\Omega=\frac{|\Omega_e|}{12}\Big(\sum_{A=1}^3x_{Ai}x_{Aj}+9\,x_{c,i}x_{c,j}\Big)-|\Omega_e|\,x_{c,i}x_{c,j}.
+\end{equation}
+These are exact; no quadrature is used. The code expands \eqref{eq:moments} monomial by monomial with $J=2|\Omega_e|$; for example $\int_{\Omega_e}x_1^2\dd\Omega=\frac{J}{12}\big(x_{11}^2+x_{21}^2+x_{31}^2+x_{11}x_{21}+x_{11}x_{31}+x_{21}x_{31}\big)$.
+
+\textbf{(iv) Inverse.} The $2\times2$ block is inverted in closed form,
+\begin{equation}\label{eq:minv}
+\begin{pmatrix}\dot U^e_{\alpha2}\\ \dot U^e_{\alpha3}\end{pmatrix}=\frac{1}{M^e_{22}M^e_{33}-(M^e_{23})^2}\begin{pmatrix}M^e_{33}&-M^e_{23}\\-M^e_{23}&M^e_{22}\end{pmatrix}\begin{pmatrix}R^e_{\alpha2}\\R^e_{\alpha3}\end{pmatrix},\qquad \dot U^e_{\alpha1}=\frac{R^e_{\alpha1}}{|\Omega_e|}.
+\end{equation}
+
+\codebox{geoel(i,11) = J/(dx*dx)*( x1*x1/12 + ... + xc*xc/2 );}{mesh1.cpp, grid::pre\_proc::set\_massMat}
+\codebox{unkel(i,m,1) += dT*(M3*rhsel(i,m,1) - M2*rhsel(i,m,2))/(M1*M3 - M2*M2);}{ddt.cpp, ddt::RK3::DG\_RK\_s1}
+
+\subsection{Volume flux vector}
+\textbf{(i) Origin.} The volume term of \eqref{eq:weak}, $\int_{\Omega_e}F_{\alpha j}\,\partial v/\partial x_j\dd\Omega$.
+
+\textbf{(ii) Substitution.} With \eqref{eq:dN},
+\begin{equation}\label{eq:rvol}
+\begin{gathered}
+R^{e,\Omega}_{\alpha a}=\int_{\Omega_e}F_{\alpha j}(U)\,\frac{\partial N_a}{\partial x_j}\dd\Omega
+\quad\Longrightarrow\\
+R^{e,\Omega}_{\alpha1}=0,\qquad R^{e,\Omega}_{\alpha2}=\frac{1}{\Delta x_1}\int_{\Omega_e}F_{\alpha1}\dd\Omega,\qquad R^{e,\Omega}_{\alpha3}=\frac{1}{\Delta x_2}\int_{\Omega_e}F_{\alpha2}\dd\Omega.
+\end{gathered}
+\end{equation}
+The cell mean receives no volume contribution, as it must for a conservative scheme.
+
+\textbf{(iii) Quadrature.} With \eqref{eq:volq},
+\begin{equation}\label{eq:rvolq}
+\boxed{\ R^{e,\Omega}_{\alpha a}=\sum_{q=1}^{3}F_{\alpha j}\big(U(x_q)\big)\,\frac{\partial N_a}{\partial x_j}\,\W_{eq}\ }
+\end{equation}
+$F_{\alpha j}$ is a rational function of $U$, so the rule is not exact, but it is exact for the linear part and adequate for $p=1$.
+
+\textbf{(iv) Code.}
+\codebox{rhsel(i,l,1) += area*domweight*Fx(U)(l)/dx;\quad rhsel(i,l,2) += area*domweight*Fy(U)(l)/dy;}{dg.cpp, DG::rhsdomn}
+
+\subsection{Face flux vector}
+\textbf{(i) Origin.} The face term of \eqref{eq:weak}, summed over the three faces of $\Omega_e$.
+
+\textbf{(ii)--(iii) Substitution and quadrature.} With \eqref{eq:faceq},
+\begin{equation}\label{eq:rface}
+\boxed{\ R^{e,\Gamma}_{\alpha a}=\sum_{f\in\partial\Omega_e}\ \sigma_{ef}\sum_{q=1}^{2}\Hf_\alpha\big(U^-(x_q),U^+(x_q);n_f\big)\,N_a(x_q)\,\frac{|\Gamma_f|}{2}\,w_q\ }
+\end{equation}
+where $\sigma_{ef}=+1$ if $e=e^-(f)$ and $\sigma_{ef}=-1$ if $e=e^+(f)$. The flux is evaluated once per face and quadrature point and scattered with opposite signs to the two neighbours, which makes the scheme conservative to round-off.
+
+\textbf{(iv) Code.} Faces are looped, not elements. Internal and boundary faces have separate loops.
+\codebox{rhsel(le-1,k,a) -= 0.5*flux(k)*w*len*N\_a(xq);\quad rhsel(re-1,k,a) += 0.5*flux(k)*w*len*N\_a(xq);}{dg.cpp, DG::rhsboun\_iface}
+\codebox{rhsel(le-1,k,a) -= 0.5*flux(k)*w*len*N\_a(xq);\quad // ghost state, see Sec. 7}{dg.cpp, DG::rhsboun\_bface}
+
+\subsection{Summary of shapes}
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Quantity & Symbol & Shape per element & Code\\
+\midrule
+Coefficients & $U^e_{\alpha a}$ & $4\times n_{\mathrm{en}}$ & \texttt{unkel(e,:,:)}\\
+Mass matrix & $M^e_{ab}$ & $n_{\mathrm{en}}\times n_{\mathrm{en}}$ (stored: 4 numbers) & \texttt{geoel(e,0), geoel(e,11:13)}\\
+Residual & $R^e_{\alpha a}$ & $4\times n_{\mathrm{en}}$ & \texttt{rhsel(e,:,:)}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%==========================================================================
+\section{The Numerical Flux: Van Leer Flux-Vector Splitting}
+
+\subsection{Splitting}
+The numerical flux is the sum of a forward-moving part from the inside state and a backward-moving part from the outside state,
+\begin{equation}\label{eq:vl}
+\boxed{\ \Hf_\alpha(U^-,U^+;n)=F^+_\alpha(U^-;n)+F^-_\alpha(U^+;n)\ }
+\end{equation}
+For a state $U$ and unit normal $n$ define
+\[
+u_n=u_jn_j,\qquad M_n=\frac{u_n}{c},\qquad f^\pm_{\rho}=\pm\tfrac14\rho c\,(M_n\pm1)^2 .
+\]
+
+\paragraph{Forward part.}
+\begin{equation}\label{eq:fplus}
+F^+_\alpha=\begin{cases}
+F_{\alpha j}n_j, & M_n>1,\\[2pt]
+0, & M_n<-1,\\[2pt]
+f^+_\rho\begin{pmatrix}1\\[1pt] u_1+n_1(-u_n+2c)/\gamma\\[1pt] u_2+n_2(-u_n+2c)/\gamma\\[1pt] \tfrac12(u_ku_k-u_n^2)+\dfrac{\big((\gamma-1)u_n+2c\big)^2}{2(\gamma^2-1)}\end{pmatrix}, & |M_n|\le1.
+\end{cases}
+\end{equation}
+
+\paragraph{Backward part.}
+\begin{equation}\label{eq:fminus}
+F^-_\alpha=\begin{cases}
+0, & M_n>1,\\[2pt]
+F_{\alpha j}n_j, & M_n<-1,\\[2pt]
+f^-_\rho\begin{pmatrix}1\\[1pt] u_1+n_1(-u_n-2c)/\gamma\\[1pt] u_2+n_2(-u_n-2c)/\gamma\\[1pt] \tfrac12(u_ku_k-u_n^2)+\dfrac{\big((\gamma-1)u_n-2c\big)^2}{2(\gamma^2-1)}\end{pmatrix}, & |M_n|\le1.
+\end{cases}
+\end{equation}
+
+\codebox{f\_plus(3) = f\_plus(0)*(0.5*(vt*vt - vn*vn) + pow((gam-1)*vn + 2*c, 2)/(2*(gam*gam-1)));}{dg.cpp, FVS::Van\_leer}
+
+\subsection{Consistency}
+Consistency \eqref{eq:numflux} requires $F^+_\alpha(U;n)+F^-_\alpha(U;n)=F_{\alpha j}(U)n_j$ for every state. For $|M_n|>1$ this holds by construction. For $|M_n|\le1$ the mass components give
+\[
+f^+_\rho+f^-_\rho=\tfrac14\rho c\big[(M_n+1)^2-(M_n-1)^2\big]=\rho c M_n=\rho u_n,
+\]
+and the energy components give, with $a_\pm=(\gamma-1)u_n\pm2c$,
+\[
+\frac{f^+_\rho a_+^2+f^-_\rho a_-^2}{2(\gamma^2-1)}+\tfrac12(u_ku_k-u_n^2)\rho u_n=u_n(\rho E+p),
+\]
+which uses $\rho E+p=\tfrac12\rho u_ku_k+\gamma p/(\gamma-1)$ and $c^2=\gamma p/\rho$. The momentum components follow the same way. The splitting is also continuous, with continuous first derivatives, at $M_n=\pm1$.
+
+\begin{remark}[Why the denominator matters at supersonic speed]
+The energy denominator is $2(\gamma^2-1)=1.92$, not $2\gamma^2-1=2.92$. With the latter the identity above fails only on the branch $|M_n|\le1$: the split flux is exact at $|M_n|>1$ and wrong below, by $\mathcal{O}(1)$ (an error of $9.7$ in the energy flux $\Hf_4$ at $M_n=0.3$ for this non-dimensionalisation; mass and momentum are unaffected). A subsonic run never crosses $|M_n|=1$ and converges to a plausible, wrong state. A supersonic run crosses it on every face near a shock or a wall, so the flux has a jump there; with the wrong denominator the M$_\infty=2.5$ channel converged to a state with $M_{\max}\approx7$, and with the correct one to $M_{\max}=3.07$.
+\end{remark}
+
+\subsection{Why the boundary conditions need no characteristic logic}
+For a supersonic face, \eqref{eq:vl} reduces to pure upwinding: if $M_n^->1$ and $M_n^+>1$ (outflow) then $\Hf=F(U^-)n$ and the ghost state is ignored; if both are $<-1$ (inflow) then $\Hf=F(U^+)n$ and the interior is ignored. This is exactly the characteristic count of \eqref{eq:bcinf}, which is why a single far-field ghost state $U^+=U_\infty$ serves as inlet and outlet in supersonic flow.
+
+%==========================================================================
+\section{Boundary Conditions: the Ghost State}\label{sec:bc}
+
+On a boundary face $U^-$ is the host-element trace and $U^+$ is a ghost state built from it. Only \eqref{eq:rface} sees it.
+
+\paragraph{Wall, $\Gamma_W$ (flag 2).} The ghost is the mirror image of the inside state in the face,
+\begin{equation}\label{eq:wall}
+\boxed{\ \rho^+=\rho^-,\qquad (\rho u_i)^+=(\rho u_i)^--2\,(\rho u_j)^-n_j\,n_i,\qquad (\rho E)^+=(\rho E)^-\ }
+\end{equation}
+so $u^+_n=-u^-_n$ with equal pressure and tangential velocity. The mass flux of $\Hf$ through the face then vanishes identically: for $|M_n|\le1$, $f^+_\rho(U^-)=\tfrac14\rho c(M_n+1)^2=-f^-_\rho(U^+)$ since $M^+_n=-M_n$, and for $|M_n|>1$ the two full fluxes $\rho u_n$ and $-\rho u_n$ cancel. This imposes \eqref{eq:bcwall} weakly; the momentum flux reduces to a normal force set by the wall pressure.
+
+\paragraph{Far field, $\Gamma_\infty$ (flag 4).}
+\begin{equation}\label{eq:farfield}
+\boxed{\ U^+_\alpha=U_{\infty,\alpha}\ }
+\end{equation}
+with $U_\infty$ from \eqref{eq:uinf}.
+
+\codebox{Ur(1) = Ul(1) - 2*(Ul(1)*nx + Ul(2)*ny)*nx;\quad Ur(2) = Ul(2) - 2*(Ul(1)*nx + Ul(2)*ny)*ny;}{dg.cpp, DG::rhsboun\_bface}
+
+\begin{remark}[Flags in the neighbour table]
+For the time-step calculation each element looks up its neighbours in \texttt{esuel}. A boundary face stores $1-\text{flag}$ there ($-1$ for a wall, $-3$ for far field), assigned per face by matching the face's two vertices, so a corner element with one wall and one far-field face receives the correct ghost on each.
+\end{remark}
+
+%==========================================================================
+\section{The Finite-Volume Limit, DG(P0)}\label{sec:fv}
+
+Truncating \eqref{eq:expansion} to $a=1$ gives a piecewise-constant state, $U_\alpha|_{\Omega_e}=\bar U^e_\alpha$. Then $M^e_{11}=|\Omega_e|$, \eqref{eq:rvol} vanishes, $U^\pm$ is constant along each face, and the face rule collapses to one point with weight $|\Gamma_f|$:
+\begin{equation}\label{eq:fv}
+\boxed{\ |\Omega_e|\,\frac{\dd\bar U^e_\alpha}{\dd t}=-\sum_{f\in\partial\Omega_e}\sigma_{ef}\,|\Gamma_f|\,\Hf_\alpha\big(\bar U^{e^-},\bar U^{e^+};n_f\big)\ }
+\end{equation}
+This is the first-order cell-centred finite-volume scheme, and it is what the driver \texttt{test.cpp} runs.
+
+\codebox{fvrhsel(le-1,m) -= len*flux(m);\quad fvrhsel(re-1,m) += len*flux(m);}{dg.cpp, DG::fv\_rhsboun\_iface}
+
+%==========================================================================
+\section{Time Integration}
+
+Write \eqref{eq:semi} as $\dot{\U}=\mathcal{L}(\U)$ with $\mathcal{L}=\M^{-1}\R$ applied element by element via \eqref{eq:minv}.
+
+\subsection{TVD Runge--Kutta 3}
+The three-stage strong-stability-preserving scheme of Shu and Osher is
+\begin{subequations}\label{eq:rk3}
+\begin{align}
+\U^{(1)}&=\U^n+\Delta t\,\mathcal{L}(\U^n),\\
+\U^{(2)}&=\tfrac34\,\U^n+\tfrac14\Big[\U^{(1)}+\Delta t\,\mathcal{L}(\U^{(1)})\Big],\\
+\U^{n+1}&=\tfrac13\,\U^n+\tfrac23\Big[\U^{(2)}+\Delta t\,\mathcal{L}(\U^{(2)})\Big].
+\end{align}
+\end{subequations}
+Each stage is a convex combination of forward-Euler steps, so any property the forward-Euler step has under a CFL limit (positivity, a maximum principle for P0) carries over. That argument needs the \emph{same} $\Delta t$ in every stage, applied to every mode of the same element: $\Delta t$ is computed once per step, before stage 1, and frozen.
+
+\codebox{fvRkstor = fvunkel; fv\_RK\_s1(mesh); fv\_RK\_s2(mesh); fv\_RK\_s3(mesh);}{ddt.cpp, ddt::RK3::RK3\_outer}
+
+\subsection{Local time step}
+For steady problems each element advances at its own stable step (pseudo-time),
+\begin{equation}\label{eq:dt}
+\boxed{\ \Delta t_e=\mathrm{CFL}\,\frac{|\Omega_e|}{\displaystyle\sum_{f\in\partial\Omega_e}|\Gamma_f|\,\lambda_f},\qquad \lambda_f=\tfrac12\big|u^-_n+u^+_n\big|+\tfrac12\big(c^-+c^+\big),\qquad \mathrm{CFL}=0.4\ }
+\end{equation}
+where $\lambda_f$ estimates the largest wave speed $|u_n|+c$ at the face from the two cell means (the ghost state on boundary faces). For time-accurate runs the global step $\Delta t=\min_e\Delta t_e$ is used instead. The FV march uses $\Delta t_e$; the DG march uses the global step.
+
+\codebox{return CFL*area/denom;\quad denom += len*0.5*(ci + cj + |vn\_i + vn\_j|);}{ddt.cpp, ddt::local\_ts}
+
+\subsection{Residual and convergence}
+The convergence monitor is the area-weighted change over one step,
+\begin{equation}\label{eq:res}
+r_\alpha=\sum_{e=1}^{n_{\mathrm{el}}}|\Omega_e|^{1/2}\,\big|\bar U^{e,n+1}_\alpha-\bar U^{e,n}_\alpha\big|,
+\end{equation}
+and the march stops when $r_\alpha<\mathrm{tol}$ for all four $\alpha$, or at the iteration limit. Note that \eqref{eq:res} is an $L^1$-type sum, not an $L^2$ norm: the square root is taken per element.
+
+%==========================================================================
+\section{Algorithm Summary}
+
+\begin{enumerate}[label=\arabic*.]
+\item \textbf{Pre-process}, in \texttt{grid::construct}. Build elements-surrounding-points, element neighbours, face lists, $|\Omega_e|$, $x_{c,i}$, $\Delta x_i$, quadrature points, $\M^e$, face normals and lengths; write BC flags into the neighbour table.
+\item \textbf{Initialise} (\texttt{soln::soln}): $U^e_{\alpha1}=U_{\infty,\alpha}$, higher modes zero.
+\item \textbf{For} $n=0,1,\dots$ until $r_\alpha<\mathrm{tol}\ \forall\alpha$:
+  \begin{enumerate}[label=(\alph*)]
+  \item store $\U^n$; compute $\Delta t_e$ by \eqref{eq:dt};
+  \item for each stage $s=1,2,3$: zero $\R$; add volume terms \eqref{eq:rvolq} (DG only); loop over boundary and internal faces, evaluating $\Hf$ by \eqref{eq:vl} at each face Gauss point and scattering \eqref{eq:rface}; update by \eqref{eq:minv} and \eqref{eq:rk3};
+  \item compute $r_\alpha$ by \eqref{eq:res}.
+  \end{enumerate}
+\item \textbf{Post-process}: write cell means and $M=|u|/c$ to VTK.
+\end{enumerate}
+
+%==========================================================================
+\appendix
+\section{Status of the DG(P1) Path}
+
+The FV path (Section~\ref{sec:fv}) is the one exercised by \texttt{test.cpp} and has been checked: geometric consistency on all meshes, flux consistency to round-off, and convergence to $10^{-6}$ for the $M_\infty=2.5$ channel. The DG(P1) path implements Sections 4--6 but has not been run end to end. Four items stand between it and a working supersonic solver.
+
+\begin{enumerate}[label=(\roman*)]
+\item \textbf{Time step from the wrong field.} \texttt{ddt::local\_ts} reads the cell means from the FV array \texttt{fvunkel}, not from $U^e_{\alpha1}$ in \texttt{unkel}. On the DG path it should read the latter.
+\item \textbf{CFL for $p=1$.} The linear stability limit of DG($p$) with RK3 scales roughly as $1/(2p+1)$, so \eqref{eq:dt} with CFL $=0.4$ (a P0 value) should be reduced by about a factor 3 for P1.
+\item \textbf{No limiter.} A P1 solution oscillates at shocks and can produce $p<0$ at the face quadrature points; the pressure floor in \eqref{eq:eos} hides this rather than preventing it. A slope limiter on $U^e_{\alpha2},U^e_{\alpha3}$ (e.g.\ minmod on the characteristic variables, or a positivity-preserving scaling) is required for supersonic flow.
+\item \textbf{Driver.} \texttt{test.cpp} calls \texttt{RK3\_outer} (FV); switching to \texttt{DG\_RK3\_outer} runs the DG march.
+\end{enumerate}
+
+\end{document}
